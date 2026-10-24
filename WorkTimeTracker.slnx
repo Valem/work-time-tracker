@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Wtt.Application/Wtt.Application.csproj" />
+    <Project Path="src/Wtt.Cli/Wtt.Cli.csproj" />
+    <Project Path="src/Wtt.Domain/Wtt.Domain.csproj" />
+    <Project Path="src/Wtt.Infrastructure/Wtt.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Wtt.Application.Tests/Wtt.Application.Tests.csproj" />
+    <Project Path="tests/Wtt.Cli.Tests/Wtt.Cli.Tests.csproj" />
+    <Project Path="tests/Wtt.Domain.Tests/Wtt.Domain.Tests.csproj" />
+    <Project Path="tests/Wtt.Infrastructure.Tests/Wtt.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,61 @@
+# ADR-006: UI — Preact + TypeScript in WebView2, a message bridge, and a locked-down, silent web view
+
+**Status:** proposed · **Decided by:** owner (web UI in WebView2) · agent (library, bridge, lockdown)
+· **Introduced by:** 001-foundation
+
+## Context
+
+The owner chose a web UI hosted in WebView2 (ADR-001). 001 needs three screens — week, day timeline,
+lunch settings — and the series adds a day-correction form (002), a balance panel (003) and a year
+planner (004). Nothing may be sent over the network (outcome 7), but WebView2 is a Chromium runtime
+with its own background services, and **no documented switch silences them all** [3]; SmartScreen
+checks every navigation unless disabled [1]. Content served through a virtual-host folder mapping
+does not raise `WebResourceRequested`, so request filtering cannot be the guard [2].
+
+## Decision
+
+- **Library:** Preact with TypeScript, bundled by Vite, tested with Vitest. The coordinator's
+  clickable prototype is the starting point for the screens.
+- **Serving:** the built assets ship in the install folder and load from a virtual host mapped to
+  it; no dev server or remote URL in a release build.
+- **Bridge:** typed JSON request/response messages over `chrome.webview.postMessage` and
+  `WebMessageReceived`, one contract defined once and checked by tests on both sides; the host
+  answers only known message types. No host objects injected into script.
+- **Lockdown, all required:**
+  - navigation outside the app host is cancelled; new windows are refused;
+  - a Content-Security-Policy of `'self'` only — no remote scripts, styles, fonts or connections;
+  - reputation checking (SmartScreen) off for the app's own pages; autofill and password saving off;
+  - the WebView2 user-data folder lives in the app's data folder (ADR-004);
+  - crash reports stay local: `IsCustomCrashReportingEnabled = true` for WebView2, and both executables
+    are excluded from Windows Error Reporting per user (`WerAddExcludedApplication`).
+- **Runtime:** the Evergreen WebView2 runtime that ships with Windows 11; its updates are Windows'
+  own (Edge Update), not the app's.
+- **Proof, not assumption:** network silence of the app's whole process tree, WebView2 children
+  included, is measured on real runs (001 concept, Phase-2 probe, Phases 3 and 4).
+
+## Rejected alternatives
+
+| Option | Why not |
+|--------|---------|
+| No framework (plain TypeScript + DOM, like the prototype) | Fine for three read-only screens; 002's editing and 004's year planner would hand-build state and re-rendering |
+| React | Same component model as Preact at ~10× the bundle |
+| Vue, Svelte | Their own template compilers and conventions for no gain here |
+| Lit / web components | Lower-level; more hand-written state for the same screens |
+| Host objects (`AddHostObjectToScript`) | COM-visible classes, harder to version and test than plain messages |
+
+## Consequences
+
+- Two languages meet only at the bridge contract; a contract change is visible in both test suites.
+- If a runtime connection cannot be eliminated by configuration, it is a **blocker for the owner**:
+  the options then are a Fixed Version WebView2 runtime in the installer (~+150 MB, its own updates)
+  or a native UI.
+- **Hard to undo:** medium — the screens are rewritten on a UI change; the core and bridge contract
+  stay.
+
+## Sources
+
+1. CoreWebView2Settings.IsReputationCheckingRequired — https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2settings.isreputationcheckingrequired
+2. Virtual hosts and WebResourceRequested — https://learn.microsoft.com/en-us/microsoft-edge/webview2/how-to/webresourcerequested · https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2.setvirtualhostnametofoldermapping
+3. WebView2 browser flags (diagnostic use; no supported switch for background networking) — https://learn.microsoft.com/microsoft-edge/webview2/concepts/webview-features-flags
+4. WerAddExcludedApplication — https://learn.microsoft.com/en-us/windows/win32/api/werapi/nf-werapi-weraddexcludedapplication
+5. CoreWebView2EnvironmentOptions.IsCustomCrashReportingEnabled — https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2environmentoptions.iscustomcrashreportingenabled
