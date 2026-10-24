@@ -1,0 +1,24 @@
+# Local-only: agent framework, feature state and assistant config never enter the public repo
+.claude/
+.ai/
+.human-ai.lock
+.mcp.json
+CLAUDE.md
+
+tools/wtt-check-result*.txt
+.playwright-mcp/
+
+# Build output
+bin/
+obj/
+artifacts/
+TestResults/
+*.user
+.vs/
+
+# Real usage data never enters the repository (ADR-005): event-log exports and data files
+*.evtx
+*.db
+*.db-shm
+*.db-wal
+local/
