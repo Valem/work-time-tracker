@@ -112,6 +112,42 @@ public sealed class LiveRecorderTests
     }
 
     [Fact]
+    public async Task A_lock_recorded_after_the_persons_next_input_keeps_the_last_input_and_timers_from_its_arrival()
+    {
+        var recorder = await StartedAsync();
+        var arrived = new LiveSignal(
+            LiveSignalKind.Locked,
+            At("2026-10-20 17:31"),
+            new SignalContext(At("2026-10-20 17:26"), desktop.Timers));
+        desktop.LastInputAt = At("2026-10-20 17:40");
+        desktop.Timers = IdleTimers.None;
+
+        await recorder.OnSignalAsync(arrived);
+
+        var ending = (await Recorded()).TakeLast(2).ToList();
+        Assert.Equal([FactKind.LastInput, FactKind.Lock], ending.Select(fact => fact.Kind));
+        Assert.Equal(At("2026-10-20 17:26"), ending[0].At);
+        Assert.Equal(new FactDetail(EndCause.IdleLock, TimeSpan.FromMinutes(5), Session: "2"), ending[1].Detail);
+    }
+
+    [Fact]
+    public async Task A_standby_keeps_the_utc_offset_in_force_when_it_arrived_after_the_time_zone_changed()
+    {
+        var recorder = await StartedAsync();
+        var beforeTravel = TimeSpan.FromHours(1);
+        var arrived = new LiveSignal(
+            LiveSignalKind.Suspending,
+            At("2026-10-20 18:00").ToOffset(beforeTravel),
+            new SignalContext(At("2026-10-20 17:59"), desktop.Timers));
+
+        await recorder.OnSignalAsync(arrived);
+
+        var ending = (await Recorded()).TakeLast(2).ToList();
+        Assert.Equal([FactKind.LastInput, FactKind.StandbyEnter], ending.Select(fact => fact.Kind));
+        Assert.All(ending, fact => Assert.Equal(beforeTravel, fact.At.Offset));
+    }
+
+    [Fact]
     public async Task A_last_input_from_before_the_Recorder_started_is_not_recorded()
     {
         var recorder = await StartedAsync();

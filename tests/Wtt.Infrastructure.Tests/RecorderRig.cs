@@ -105,10 +105,12 @@ internal sealed class RecorderRig : IDisposable
         Desktop.LastInputAt = At(at);
     }
 
+    /// <summary>Windows sends a notification; as the Recorder's window does, the session is read on arrival.</summary>
     public async Task SignalAsync(LiveSignalKind kind, string at)
     {
         await RunUntilAsync(at);
-        await Recorder!.OnSignalAsync(new LiveSignal(kind, At(at)));
+        var context = new SignalContext(Desktop.LastInput(), Desktop.TimersInForce());
+        await Recorder!.OnSignalAsync(new LiveSignal(kind, At(at), context));
     }
 
     /// <summary>Standby, Recorder stopped or the laptop off: time passes and the Recorder sees none of it.</summary>

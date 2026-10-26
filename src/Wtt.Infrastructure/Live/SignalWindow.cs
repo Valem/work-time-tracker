@@ -4,6 +4,7 @@ using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.System.Power;
 using Windows.Win32.UI.WindowsAndMessaging;
+using Wtt.Application.Ports;
 using Wtt.Application.Recording;
 using static Wtt.Infrastructure.Live.WindowsSignals;
 
@@ -13,9 +14,15 @@ namespace Wtt.Infrastructure.Live;
 /// A window that is never shown, receiving session and power notifications for the Recorder. It is a
 /// top-level window, not a message-only one, because Windows tells only top-level windows that the session
 /// ends (sign-out, shutdown, an installer closing the program). It asks Windows for notifications only —
-/// it never holds a power request, so it never keeps the laptop awake.
+/// it never holds a power request, so it never keeps the laptop awake. Each signal is dated and given the
+/// session's last input and timers here, on arrival, as it may be recorded later.
 /// </summary>
-public sealed class SignalWindow(Action<LiveSignal> onSignal, Action onCloseRequested, Action<Exception> onError, TimeProvider clock)
+public sealed class SignalWindow(
+    Action<LiveSignal> onSignal,
+    Action onCloseRequested,
+    Action<Exception> onError,
+    IDesktop desktop,
+    TimeProvider clock)
 {
     private const string ClassName = "WorkTimeTracker.Recorder.Signals";
     private const uint WM_SETTINGCHANGE = 0x001A;
@@ -123,7 +130,7 @@ public sealed class SignalWindow(Action<LiveSignal> onSignal, Action onCloseRequ
                     Raise(wParam.Value == PBT_POWERSETTINGCHANGE ? PowerSetting(lParam) : FromPowerBroadcast(wParam.Value));
                     return new LRESULT(1);
                 case WM_QUERYENDSESSION:
-                    endSessionAskedAt ??= clock.GetUtcNow();
+                    endSessionAskedAt ??= Now();
                     return new LRESULT(1);
                 case WM_ENDSESSION:
                     OnEndSession(FromEndSession(wParam.Value != 0, lParam.Value));
@@ -151,15 +158,15 @@ public sealed class SignalWindow(Action<LiveSignal> onSignal, Action onCloseRequ
     /// <summary>Sign-out and shutdown are dated when Windows first asked, which is when the person chose them.</summary>
     private void OnEndSession(SessionEnding ending)
     {
-        var at = endSessionAskedAt ?? clock.GetUtcNow();
+        var at = endSessionAskedAt ?? Now();
         endSessionAskedAt = null;
         switch (ending)
         {
             case SessionEnding.SigningOut:
-                onSignal(new LiveSignal(LiveSignalKind.SigningOut, at));
+                onSignal(new LiveSignal(LiveSignalKind.SigningOut, at, ReadContext()));
                 break;
             case SessionEnding.ShuttingDown:
-                onSignal(new LiveSignal(LiveSignalKind.ShuttingDown, at));
+                onSignal(new LiveSignal(LiveSignalKind.ShuttingDown, at, ReadContext()));
                 break;
             case SessionEnding.CloseRequested:
                 onCloseRequested();
@@ -171,7 +178,24 @@ public sealed class SignalWindow(Action<LiveSignal> onSignal, Action onCloseRequ
     {
         if (kind is { } signal)
         {
-            onSignal(new LiveSignal(signal, clock.GetUtcNow()));
+            onSignal(new LiveSignal(signal, Now(), ReadContext()));
+        }
+    }
+
+    /// <summary>The time zone is read afresh: <c>WM_TIMECHANGE</c> clears the cached one on this thread.</summary>
+    private DateTimeOffset Now() => TimeZoneInfo.ConvertTime(clock.GetUtcNow(), clock.LocalTimeZone);
+
+    /// <summary>A failed read never loses the signal: the Recorder then reads the session when it records it.</summary>
+    private SignalContext? ReadContext()
+    {
+        try
+        {
+            return new SignalContext(desktop.LastInput(), desktop.TimersInForce());
+        }
+        catch (Exception failure)
+        {
+            onError(failure);
+            return null;
         }
     }
 

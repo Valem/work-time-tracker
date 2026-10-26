@@ -54,7 +54,7 @@ public sealed class LiveRecorder(
     /// </summary>
     public async Task StartAsync()
     {
-        var now = clock.GetUtcNow();
+        var now = Now();
         session = desktop.CurrentSession();
         locked = session.Locked;
         startedAt = now;
@@ -63,7 +63,7 @@ public sealed class LiveRecorder(
         await coverage.BeginAsync(session.SignedInAt);
         idleLockWritten = EndReasons.IdleLockInForce(desktop.TimersInForce());
         await journal.AppendAsync([
-            Fact(FactKind.SignIn, session.SignedInAt),
+            Fact(FactKind.SignIn, InForceAt(session.SignedInAt)),
             IdleTimeoutFact(now, idleLockWritten),
         ]);
         if (!locked)
@@ -77,7 +77,7 @@ public sealed class LiveRecorder(
 
     public async Task HeartbeatAsync()
     {
-        var now = clock.GetUtcNow();
+        var now = Now();
         if (suspendedAt is { } suspended)
         {
             if (now - suspended > SuspendSettling)
@@ -113,27 +113,27 @@ public sealed class LiveRecorder(
         }
 
         StopAwaitingInput();
-        await journal.AppendAsync([Fact(FactKind.LastInput, lastInput)]);
+        await journal.AppendAsync([Fact(FactKind.LastInput, InForceAt(lastInput))]);
     }
 
     public Task OnSignalAsync(LiveSignal signal) => signal.Kind switch
     {
-        LiveSignalKind.Locked => OnLockedAsync(signal.At),
+        LiveSignalKind.Locked => OnLockedAsync(signal),
         LiveSignalKind.Unlocked => OnUnlockedAsync(signal.At),
-        LiveSignalKind.Suspending => OnSuspendingAsync(signal.At),
+        LiveSignalKind.Suspending => OnSuspendingAsync(signal),
         LiveSignalKind.Resumed => OnResumedAsync(signal.At),
         LiveSignalKind.LidClosed => OnLidAsync(signal.At),
         LiveSignalKind.LidOpened => OnLidAsync(closedAt: null),
-        LiveSignalKind.SigningOut => OnSessionEndAsync(FactKind.SignOut, EndCause.SignOut, signal.At),
-        LiveSignalKind.ShuttingDown => OnSessionEndAsync(FactKind.Shutdown, EndCause.Shutdown, signal.At),
+        LiveSignalKind.SigningOut => OnSessionEndAsync(FactKind.SignOut, EndCause.SignOut, signal),
+        LiveSignalKind.ShuttingDown => OnSessionEndAsync(FactKind.Shutdown, EndCause.Shutdown, signal),
         _ => throw new ArgumentOutOfRangeException(nameof(signal), signal.Kind, "Unknown signal."),
     };
 
-    private Task OnLockedAsync(DateTimeOffset at)
+    private Task OnLockedAsync(LiveSignal signal)
     {
         locked = true;
         StopAwaitingInput();
-        return EndUseAsync(FactKind.Lock, at, idle => EndReasons.ForLock(idle, desktop.TimersInForce(), LidJustClosed(at)));
+        return EndUseAsync(FactKind.Lock, signal, (idle, timers) => EndReasons.ForLock(idle, timers, LidJustClosed(signal.At)));
     }
 
     private Task OnUnlockedAsync(DateTimeOffset at)
@@ -143,15 +143,16 @@ public sealed class LiveRecorder(
         return journal.AppendAsync([Fact(FactKind.Unlock, at)]);
     }
 
-    private async Task OnSuspendingAsync(DateTimeOffset at)
+    private async Task OnSuspendingAsync(LiveSignal signal)
     {
         if (suspendedAt is not null)
         {
             return;
         }
 
+        var at = signal.At;
         StopAwaitingInput();
-        await EndUseAsync(FactKind.StandbyEnter, at, idle => EndReasons.ForStandby(idle, desktop.TimersInForce(), LidJustClosed(at)));
+        await EndUseAsync(FactKind.StandbyEnter, signal, (idle, timers) => EndReasons.ForStandby(idle, timers, LidJustClosed(at)));
         await coverage.ExtendAsync(at);
         suspendedAt = at;
         lastBeat = at;
@@ -200,25 +201,30 @@ public sealed class LiveRecorder(
         return Task.CompletedTask;
     }
 
-    private async Task OnSessionEndAsync(FactKind kind, EndCause cause, DateTimeOffset at)
+    private async Task OnSessionEndAsync(FactKind kind, EndCause cause, LiveSignal signal)
     {
         StopAwaitingInput();
-        await EndUseAsync(kind, at, _ => new EndReason(cause));
-        await coverage.ExtendAsync(at);
-        lastBeat = at;
+        await EndUseAsync(kind, signal, (_, _) => new EndReason(cause));
+        await coverage.ExtendAsync(signal.At);
+        lastBeat = signal.At;
     }
 
-    /// <summary>The session's last input goes with every end, so a timer end can fall back to it (BR-003).</summary>
-    private Task EndUseAsync(FactKind kind, DateTimeOffset at, Func<TimeSpan, EndReason> reasonAfterIdle)
+    /// <summary>
+    /// The session's last input goes with every end, so a timer end can fall back to it (BR-003). Both it and the
+    /// timers are taken as they were when the signal arrived.
+    /// </summary>
+    private Task EndUseAsync(FactKind kind, LiveSignal signal, Func<TimeSpan, IdleTimers, EndReason> reasonAfterIdle)
     {
-        var lastInput = desktop.LastInput();
+        var at = signal.At;
+        var context = signal.Context ?? new SignalContext(desktop.LastInput(), desktop.TimersInForce());
+        var lastInput = context.LastInput;
         var idle = at > lastInput ? at - lastInput : TimeSpan.Zero;
-        var reason = reasonAfterIdle(idle);
+        var reason = reasonAfterIdle(idle, context.Timers);
 
         var facts = new List<ActivityFact>();
         if (lastInput >= startedAt && lastInput <= at)
         {
-            facts.Add(Fact(FactKind.LastInput, lastInput));
+            facts.Add(Fact(FactKind.LastInput, lastInput.ToOffset(at.Offset)));
         }
 
         facts.Add(Fact(kind, at, new FactDetail(reason.Cause, reason.Timer, Session: Session.Id)));
@@ -266,11 +272,14 @@ public sealed class LiveRecorder(
     private ActivityFact IdleTimeoutFact(DateTimeOffset at, EndReason? idleLock) =>
         Fact(FactKind.IdleTimeout, at, new FactDetail(idleLock?.Cause, idleLock?.Timer, Session: Session.Id));
 
-    private ActivityFact Fact(FactKind kind, DateTimeOffset at, FactDetail? detail = null)
-    {
-        var local = TimeZoneInfo.ConvertTime(at, clock.LocalTimeZone);
-        return new ActivityFact(local, kind, FactSource.Live, SourceKey(kind, local), detail ?? new FactDetail(Session: Session.Id));
-    }
+    private DateTimeOffset Now() => InForceAt(clock.GetUtcNow());
+
+    /// <summary>An instant Windows reported, with the UTC offset the local time zone gives it.</summary>
+    private DateTimeOffset InForceAt(DateTimeOffset instant) => TimeZoneInfo.ConvertTime(instant, clock.LocalTimeZone);
+
+    /// <summary><paramref name="at"/> carries the UTC offset in force when it happened, and the fact keeps it.</summary>
+    private ActivityFact Fact(FactKind kind, DateTimeOffset at, FactDetail? detail = null) =>
+        new(at, kind, FactSource.Live, SourceKey(kind, at), detail ?? new FactDetail(Session: Session.Id));
 
     /// <summary>Kind, session and instant: the same sign-in or last input noted twice is stored once.</summary>
     private string SourceKey(FactKind kind, DateTimeOffset at) =>

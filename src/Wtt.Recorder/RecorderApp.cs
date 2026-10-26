@@ -21,6 +21,9 @@ internal static class RecorderApp
     /// <summary>Windows gives a program a few seconds at sign-out or shutdown; the last facts must be written in them.</summary>
     private static readonly TimeSpan EndSessionWait = TimeSpan.FromSeconds(4);
 
+    /// <summary>Windows may freeze the process soon after announcing a suspend; the standby is written first.</summary>
+    private static readonly TimeSpan SuspendWait = TimeSpan.FromSeconds(1.5);
+
     private static readonly TimeSpan StopWait = TimeSpan.FromSeconds(10);
 
     public static int Run(string[] args)
@@ -59,7 +62,8 @@ internal static class RecorderApp
     private static void Record(RecorderOptions options, IErrorLog errors)
     {
         var clock = TimeProvider.System;
-        var recorder = Compose(options, errors, clock);
+        var desktop = new WindowsDesktop(clock);
+        var recorder = Compose(options, errors, desktop, clock);
         recorder.StartAsync().GetAwaiter().GetResult();
 
         var worker = new RecorderWorker(errors);
@@ -70,6 +74,7 @@ internal static class RecorderApp
             onSignal: signal => Dispatch(worker, recorder, signal),
             onCloseRequested: () => window?.Close(),
             onError: failure => errors.Write("Reading a Windows notification", failure),
+            desktop,
             clock);
 
         using var heartbeat = new Timer(
@@ -94,13 +99,22 @@ internal static class RecorderApp
         worker.Stop(StopWait);
     }
 
-    /// <summary>At sign-out and shutdown the window waits for the write: Windows ends the process once it returns.</summary>
+    /// <summary>
+    /// At sign-out and shutdown the window waits for the write, as Windows ends the process once it returns; at a
+    /// suspend it waits briefly, as Windows may freeze the process.
+    /// </summary>
     private static void Dispatch(RecorderWorker worker, LiveRecorder recorder, LiveSignal signal)
     {
         var context = $"Recording {signal.Kind}";
-        if (signal.Kind is LiveSignalKind.SigningOut or LiveSignalKind.ShuttingDown)
+        var wait = signal.Kind switch
         {
-            worker.PostAndWait(context, () => recorder.OnSignalAsync(signal), EndSessionWait);
+            LiveSignalKind.SigningOut or LiveSignalKind.ShuttingDown => EndSessionWait,
+            LiveSignalKind.Suspending => SuspendWait,
+            _ => TimeSpan.Zero,
+        };
+        if (wait > TimeSpan.Zero)
+        {
+            worker.PostAndWait(context, () => recorder.OnSignalAsync(signal), wait);
         }
         else
         {
@@ -108,13 +122,13 @@ internal static class RecorderApp
         }
     }
 
-    private static LiveRecorder Compose(RecorderOptions options, IErrorLog errors, TimeProvider clock)
+    private static LiveRecorder Compose(RecorderOptions options, IErrorLog errors, IDesktop desktop, TimeProvider clock)
     {
         var database = SqliteDatabase.Open(options.DataFile, clock);
         var journal = new SqliteFactJournal(database);
         var user = new UserSid(WindowsIdentity.GetCurrent().User?.Value ?? throw new InvalidOperationException("No Windows user."));
         var history = new HistoryImport(new HistoryInCurrentZone(), journal, new SqliteHistoryCursorStore(database));
-        return new LiveRecorder(journal, new SqliteCoverageLog(database, clock), history, user, new WindowsDesktop(clock), errors, clock);
+        return new LiveRecorder(journal, new SqliteCoverageLog(database, clock), history, user, desktop, errors, clock);
     }
 
     /// <summary>The Recorder runs for days: each read takes the time zone in force then, not the one at start.</summary>
