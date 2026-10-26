@@ -24,6 +24,8 @@ public sealed record LunchDeduction(Pause? Pause, TimeSpan Deducted, LunchBasis 
 /// <summary>
 /// One local date's work, derived from presence and the rule in force — never stored.
 /// Blocks run from start to end and split only at the night pause; the lunch deduction lies inside them.
+/// An evening pause ends the day where it starts: the use after it is no block and adds only
+/// <see cref="EveningUse"/> to the attendance.
 /// </summary>
 public sealed record Workday(
     DateOnly Date,
@@ -33,7 +35,9 @@ public sealed record Workday(
     LunchDeduction Lunch,
     TimeSpan Attendance,
     TimeSpan Total,
-    Precision Precision)
+    Precision Precision,
+    Pause? EveningPause = null,
+    TimeSpan EveningUse = default)
 {
     public static Workday WithoutUse(DateOnly date) =>
         new(date, [], [], null, LunchDeduction.None, TimeSpan.Zero, TimeSpan.Zero, Precision.Exact);
@@ -42,7 +46,10 @@ public sealed record Workday(
 
     public DateTimeOffset? Start => HasUse ? Blocks[0].Start : null;
 
-    /// <summary>The day's end; the next midnight (24:00) when work carried over into the following day.</summary>
+    /// <summary>
+    /// The day's end: where the evening pause starts, else the end of the last use — the next midnight
+    /// (24:00) when work carried over into the following day.
+    /// </summary>
     public DateTimeOffset? End => HasUse ? Blocks[^1].End : null;
 
     public TimeSpan Break => Lunch.Deducted;

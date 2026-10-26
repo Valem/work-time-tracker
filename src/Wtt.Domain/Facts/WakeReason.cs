@@ -1,13 +1,15 @@
 namespace Wtt.Domain.Facts;
 
 /// <summary>
-/// Names of the reasons a laptop leaves standby. Only input, the power button and the lid point at
-/// a person — and even those need the 2-minute test, because Windows reports night wakes the same way.
+/// Names of the reasons a laptop leaves standby. Only input, a fingerprint, the power button and the
+/// lid point at a person — and even those need the 2-minute test, because Windows reports night wakes
+/// the same way.
 /// </summary>
 public static class WakeReason
 {
     public const string PowerButton = "PowerButton";
     public const string Lid = "Lid";
+    public const string Fingerprint = "Fingerprint";
     public const string UserInput = "UserInput";
     public const string InputKeyboard = "InputKeyboard";
     public const string InputMouse = "InputMouse";
@@ -21,7 +23,7 @@ public static class WakeReason
 
     private static readonly HashSet<string> PersonReasons =
     [
-        PowerButton, Lid, UserInput, InputKeyboard, InputMouse, InputTouchpad, InputPen, InputHid, InputTouch,
+        PowerButton, Lid, Fingerprint, UserInput, InputKeyboard, InputMouse, InputTouchpad, InputPen, InputHid, InputTouch,
     ];
 
     public static bool IsPerson(string? reason) => reason is not null && PersonReasons.Contains(reason);
