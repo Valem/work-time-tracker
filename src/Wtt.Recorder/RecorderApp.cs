@@ -1,0 +1,126 @@
+using System.Security.Principal;
+using Wtt.Application.History;
+using Wtt.Application.Ports;
+using Wtt.Application.Recording;
+using Wtt.Infrastructure.Diagnostics;
+using Wtt.Infrastructure.History;
+using Wtt.Infrastructure.Live;
+using Wtt.Infrastructure.Storage;
+
+namespace Wtt.Recorder;
+
+/// <summary>
+/// The headless per-user Recorder: one per Windows user session, started at sign-in by the Run key or by
+/// the App. It records live facts and coverage and catches up on Windows history; it knows nothing about days.
+/// </summary>
+internal static class RecorderApp
+{
+    /// <summary>The App looks for this to tell whether the Recorder runs.</summary>
+    public const string InstanceMutexName = @"Local\WorkTimeTracker.Recorder";
+
+    /// <summary>Windows gives a program a few seconds at sign-out or shutdown; the last facts must be written in them.</summary>
+    private static readonly TimeSpan EndSessionWait = TimeSpan.FromSeconds(4);
+
+    private static readonly TimeSpan StopWait = TimeSpan.FromSeconds(10);
+
+    public static int Run(string[] args)
+    {
+        if (!RecorderOptions.TryParse(args, out var options))
+        {
+            return 2;
+        }
+
+        var errors = new ErrorLog(Path.Combine(options.DataFolder, ErrorLog.FileName));
+        AppDomain.CurrentDomain.UnhandledException += (_, failure) =>
+            errors.Write("Recorder failed", failure.ExceptionObject as Exception ?? new InvalidOperationException("Unknown failure."));
+
+        using var instance = new Mutex(initiallyOwned: true, InstanceMutexName, out var firstInstance);
+        if (!firstInstance)
+        {
+            return 0;
+        }
+
+        try
+        {
+            Record(options, errors);
+            return 0;
+        }
+        catch (Exception failure)
+        {
+            errors.Write("Recorder stopped", failure);
+            return 1;
+        }
+        finally
+        {
+            instance.ReleaseMutex();
+        }
+    }
+
+    private static void Record(RecorderOptions options, IErrorLog errors)
+    {
+        var clock = TimeProvider.System;
+        var recorder = Compose(options, errors, clock);
+        recorder.StartAsync().GetAwaiter().GetResult();
+
+        var worker = new RecorderWorker(errors);
+        worker.Post("Importing Windows history", recorder.CatchUpAsync);
+
+        SignalWindow? window = null;
+        window = new SignalWindow(
+            onSignal: signal => Dispatch(worker, recorder, signal),
+            onCloseRequested: () => window?.Close(),
+            onError: failure => errors.Write("Reading a Windows notification", failure),
+            clock);
+
+        using var heartbeat = new Timer(
+            _ => worker.Post("Heartbeat", recorder.HeartbeatAsync),
+            null,
+            LiveRecorder.HeartbeatInterval,
+            LiveRecorder.HeartbeatInterval);
+        using var inputPoll = new Timer(
+            _ =>
+            {
+                if (recorder.AwaitsInput)
+                {
+                    worker.Post("Reading the last input", recorder.PollInputAsync);
+                }
+            },
+            null,
+            LiveRecorder.InputPollInterval,
+            LiveRecorder.InputPollInterval);
+
+        window.Run();
+        worker.Post("Closing", recorder.HeartbeatAsync);
+        worker.Stop(StopWait);
+    }
+
+    /// <summary>At sign-out and shutdown the window waits for the write: Windows ends the process once it returns.</summary>
+    private static void Dispatch(RecorderWorker worker, LiveRecorder recorder, LiveSignal signal)
+    {
+        var context = $"Recording {signal.Kind}";
+        if (signal.Kind is LiveSignalKind.SigningOut or LiveSignalKind.ShuttingDown)
+        {
+            worker.PostAndWait(context, () => recorder.OnSignalAsync(signal), EndSessionWait);
+        }
+        else
+        {
+            worker.Post(context, () => recorder.OnSignalAsync(signal));
+        }
+    }
+
+    private static LiveRecorder Compose(RecorderOptions options, IErrorLog errors, TimeProvider clock)
+    {
+        var database = SqliteDatabase.Open(options.DataFile, clock);
+        var journal = new SqliteFactJournal(database);
+        var user = new UserSid(WindowsIdentity.GetCurrent().User?.Value ?? throw new InvalidOperationException("No Windows user."));
+        var history = new HistoryImport(new HistoryInCurrentZone(), journal, new SqliteHistoryCursorStore(database));
+        return new LiveRecorder(journal, new SqliteCoverageLog(database, clock), history, user, new WindowsDesktop(clock), errors, clock);
+    }
+
+    /// <summary>The Recorder runs for days: each read takes the time zone in force then, not the one at start.</summary>
+    private sealed class HistoryInCurrentZone : IHistorySource
+    {
+        public Task<HistoryBatch> ReadSinceAsync(HistoryCursor cursor, UserSid user) =>
+            new EventLogHistorySource(TimeZoneInfo.Local).ReadSinceAsync(cursor, user);
+    }
+}
