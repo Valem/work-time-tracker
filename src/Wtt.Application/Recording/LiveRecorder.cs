@@ -49,8 +49,9 @@ public sealed class LiveRecorder(
     private SignInSession Session => session ?? throw new InvalidOperationException("The Recorder has not started.");
 
     /// <summary>
-    /// Coverage (from the sign-in when started right after it), the sign-in and the idle lock timeout in force;
-    /// <see cref="CatchUpAsync"/> follows.
+    /// Coverage (from the sign-in when started right after it), the idle lock timeout in force, and the sign-in
+    /// only when coverage reaches back to it: a sign-in before coverage is history's, so the stretch up to the start
+    /// is rebuilt. <see cref="CatchUpAsync"/> follows.
     /// </summary>
     public async Task StartAsync()
     {
@@ -60,12 +61,16 @@ public sealed class LiveRecorder(
         startedAt = now;
         lastBeat = now;
 
-        await coverage.BeginAsync(session.SignedInAt);
+        var coveredFrom = await coverage.BeginAsync(session.SignedInAt);
         idleLockWritten = EndReasons.IdleLockInForce(desktop.TimersInForce());
-        await journal.AppendAsync([
-            Fact(FactKind.SignIn, InForceAt(session.SignedInAt)),
-            IdleTimeoutFact(now, idleLockWritten),
-        ]);
+        var facts = new List<ActivityFact>();
+        if (coveredFrom <= session.SignedInAt)
+        {
+            facts.Add(Fact(FactKind.SignIn, InForceAt(session.SignedInAt)));
+        }
+
+        facts.Add(IdleTimeoutFact(now, idleLockWritten));
+        await journal.AppendAsync(facts);
         if (!locked)
         {
             AwaitInputSince(now);

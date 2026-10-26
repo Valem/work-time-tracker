@@ -11,19 +11,22 @@ public sealed class SqliteCoverageLog(SqliteDatabase database, TimeProvider? clo
 
     private readonly TimeProvider clock = clock ?? TimeProvider.System;
 
-    public Task BeginAsync(DateTimeOffset signedInAt)
+    public Task<DateTimeOffset> BeginAsync(DateTimeOffset signedInAt)
     {
         var now = clock.GetUtcNow();
         var signedIn = DateTimeOffsetExtensions.Min(signedInAt, now);
+        var coveredFrom = now;
         Write((latest, span) =>
         {
             if (latest is not { } covered || covered.To < signedIn)
             {
                 var startedAtSignIn = now - signedIn <= ICoverageLog.MaxAutostartDelay;
-                span.Insert(startedAtSignIn ? signedIn : now, now);
+                coveredFrom = startedAtSignIn ? signedIn : now;
+                span.Insert(coveredFrom, now);
             }
             else if (IsHeartbeatAfter(covered, now))
             {
+                coveredFrom = covered.From;
                 span.Extend(covered, now);
             }
             else
@@ -31,7 +34,7 @@ public sealed class SqliteCoverageLog(SqliteDatabase database, TimeProvider? clo
                 span.Insert(now, now);
             }
         });
-        return Task.CompletedTask;
+        return Task.FromResult(coveredFrom);
     }
 
     public Task ExtendAsync(DateTimeOffset now)

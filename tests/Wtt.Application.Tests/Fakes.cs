@@ -39,7 +39,7 @@ internal sealed class InMemoryCoverageLog : ICoverageLog
 {
     public List<CoverageSpan> Spans { get; } = [];
 
-    public Task BeginAsync(DateTimeOffset signedInAt) => throw new NotSupportedException();
+    public Task<DateTimeOffset> BeginAsync(DateTimeOffset signedInAt) => throw new NotSupportedException();
 
     public Task ExtendAsync(DateTimeOffset now) => throw new NotSupportedException();
 

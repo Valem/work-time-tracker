@@ -41,6 +41,17 @@ public sealed class LiveRecorderTests
     }
 
     [Fact]
+    public async Task A_start_whose_coverage_begins_after_the_sign_in_leaves_the_sign_in_to_history()
+    {
+        clock.Now = At("2026-10-20 10:10");
+        coverage.CoveredFrom = clock.Now;
+
+        await NewRecorder().StartAsync();
+
+        Assert.Equal([FactKind.IdleTimeout], (await Recorded()).Select(fact => fact.Kind));
+    }
+
+    [Fact]
     public async Task Live_facts_carry_the_utc_offset_in_force_when_they_happened()
     {
         clock.Now = clock.Now.ToUniversalTime();
@@ -362,7 +373,14 @@ public sealed class LiveRecorderTests
     {
         public List<string> Calls { get; } = [];
 
-        public Task BeginAsync(DateTimeOffset signedInAt) => Note($"Begin {Time(signedInAt)}");
+        /// <summary>Where the coverage of a start begins; the sign-in when not set.</summary>
+        public DateTimeOffset? CoveredFrom { get; set; }
+
+        public async Task<DateTimeOffset> BeginAsync(DateTimeOffset signedInAt)
+        {
+            await Note($"Begin {Time(signedInAt)}");
+            return CoveredFrom ?? signedInAt;
+        }
 
         public Task ExtendAsync(DateTimeOffset now) => Note($"Extend {Time(now)}");
 

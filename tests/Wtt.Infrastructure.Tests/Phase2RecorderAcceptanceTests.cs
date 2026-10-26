@@ -226,6 +226,41 @@ public sealed class Phase2RecorderAcceptanceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_start_by_the_App_hours_after_a_sign_in_the_Run_entry_missed_marks_the_day_rebuilt_during_continuous_use()
+    {
+        await LockedOvernightAsync();
+        await rig.SignalAsync(Unlocked, "2026-10-20 08:00:00");
+        await rig.SignalAsync(ShuttingDown, "2026-10-20 12:00:00");
+
+        rig.TimePassesUnseen("2026-10-20 15:00:00");
+        rig.WindowsLogs(FactKind.SignIn, "2026-10-20 13:00:00", FactSource.SystemHistory);
+        rig.Desktop.LastInputAt = At("2026-10-20 14:59:50");
+        await rig.StartRecorderAsync("2", signedInAt: "2026-10-20 13:00:00");
+        await rig.InputAsync("2026-10-20 16:59:59");
+        await rig.SignalAsync(Locked, "2026-10-20 17:00:00");
+
+        var day = await rig.DayAsync("2026-10-20");
+        Assert.True(day.IsRebuilt);
+        Assert.Equal(At("2026-10-20 15:00:00"), (await rig.SpansAsync())[^1].From);
+    }
+
+    [Fact]
+    public async Task A_first_install_hours_after_the_sign_in_the_same_day_marks_the_day_rebuilt_during_continuous_use()
+    {
+        rig.TimePassesUnseen("2026-10-20 10:00:00");
+        rig.WindowsLogs(FactKind.SignIn, "2026-10-20 08:00:00", FactSource.SystemHistory);
+        rig.Desktop.LastInputAt = At("2026-10-20 09:59:50");
+        await rig.StartRecorderAsync("1", signedInAt: "2026-10-20 08:00:00");
+        await rig.InputAsync("2026-10-20 16:59:59");
+        await rig.SignalAsync(Locked, "2026-10-20 17:00:00");
+
+        var day = await rig.DayAsync("2026-10-20");
+        Assert.True(day.IsRebuilt);
+        Within(At("2026-10-20 08:00:00"), day.Start);
+        Assert.Equal(At("2026-10-20 10:00:00"), Assert.Single(await rig.SpansAsync()).From);
+    }
+
+    [Fact]
     public async Task A_Recorder_restarted_after_a_resume_without_a_lock_screen_starts_use_at_the_first_input_after_its_start()
     {
         await LockedOvernightAsync();

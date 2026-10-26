@@ -17,9 +17,10 @@ public sealed class CoverageLogTests : IDisposable
     {
         var coverage = Open();
 
-        await coverage.BeginAsync(At(8, 10));
+        var coveredFrom = await coverage.BeginAsync(At(8, 10));
 
         Assert.Equal([new CoverageSpan(At(8, 10), At(8, 10, 40))], await Spans(coverage));
+        Assert.Equal(At(8, 10), coveredFrom);
     }
 
     [Fact]
@@ -28,9 +29,10 @@ public sealed class CoverageLogTests : IDisposable
         var coverage = Open();
         clock.Now = At(8, 10).AddDays(3);
 
-        await coverage.BeginAsync(At(8, 10));
+        var coveredFrom = await coverage.BeginAsync(At(8, 10));
 
         Assert.Equal([new CoverageSpan(clock.Now, clock.Now)], await Spans(coverage));
+        Assert.Equal(clock.Now, coveredFrom);
     }
 
     [Fact]
@@ -41,11 +43,12 @@ public sealed class CoverageLogTests : IDisposable
         await BeatUntilAsync(coverage, At(12, 0));
 
         clock.Now = At(15, 0);
-        await coverage.BeginAsync(At(13, 0));
+        var coveredFrom = await coverage.BeginAsync(At(13, 0));
 
         Assert.Equal(
             [new CoverageSpan(At(8, 10), At(12, 0)), new CoverageSpan(At(15, 0), At(15, 0))],
             await Spans(coverage));
+        Assert.Equal(At(15, 0), coveredFrom);
     }
 
     [Fact]
@@ -56,9 +59,10 @@ public sealed class CoverageLogTests : IDisposable
         await BeatUntilAsync(coverage, At(9, 0));
 
         clock.Now = At(9, 1, 30);
-        await coverage.BeginAsync(At(8, 10));
+        var coveredFrom = await coverage.BeginAsync(At(8, 10));
 
         Assert.Equal([new CoverageSpan(At(8, 10), At(9, 1, 30))], await Spans(coverage));
+        Assert.Equal(At(8, 10), coveredFrom);
     }
 
     [Fact]
@@ -69,11 +73,12 @@ public sealed class CoverageLogTests : IDisposable
         await BeatUntilAsync(coverage, At(10, 0));
 
         clock.Now = At(10, 30);
-        await coverage.BeginAsync(At(8, 10));
+        var coveredFrom = await coverage.BeginAsync(At(8, 10));
 
         Assert.Equal(
             [new CoverageSpan(At(8, 10), At(10, 0)), new CoverageSpan(At(10, 30), At(10, 30))],
             await Spans(coverage));
+        Assert.Equal(At(10, 30), coveredFrom);
     }
 
     [Fact]

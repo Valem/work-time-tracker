@@ -21,7 +21,8 @@ public interface ICoverageLog
     /// it, and begins now otherwise. When this session was covered before, only a gap shorter than
     /// <see cref="MaxHeartbeatGap"/> is bridged, and a longer one stays uncovered for history to fill.
     /// </summary>
-    Task BeginAsync(DateTimeOffset signedInAt);
+    /// <returns>Where the span this start opens or continues begins.</returns>
+    Task<DateTimeOffset> BeginAsync(DateTimeOffset signedInAt);
 
     Task ExtendAsync(DateTimeOffset now);
 
