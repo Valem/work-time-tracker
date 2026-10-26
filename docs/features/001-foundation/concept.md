@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.3.0 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.3.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.2.0
+**Version:** v1.3.1 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.3.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.2.0
 
 ## 1. Executive Context
 
@@ -49,7 +49,7 @@
 | BR-009 | **Rule in force:** until the first save, every day — before and after install — uses the prefilled rule (P1); then the days before install use the last rule saved on the first save's day, the days from install to that day keep the prefilled rule, and each saved rule applies from its own date until the next (K4) |
 | BR-010 | **Week:** Monday to Sunday; week total = sum of the day totals |
 | BR-011 | **Precision:** a day whose use comes partly from history outside coverage is marked rebuilt (K1) — except the stretch from sign-in to the Recorder's start, filled from history unmarked |
-| BR-012 | **Evening pause:** the day's last pause, when it lasts 2 h or more and is neither the lunch pause nor the night pause, ends the day where it starts; the time from its end to the end of the last use — 24:00 when that use runs past midnight (BR-005, BR-006) — is evening use and adds only its own minutes. A last pause of 1:59 changes nothing |
+| BR-012 | **Evening pause:** the day's last pause, when it lasts 2 h or more and is neither the lunch pause nor the night pause, ends the day where it starts; the time from its end to the end of the last use — 24:00 when that use runs past midnight (BR-005, BR-006) — is evening use and adds only its own minutes. A last pause ending before the lunch window opens is a morning pause and stays work. A last pause of 1:59 changes nothing |
 
 ### Traceability Matrix
 
@@ -244,7 +244,7 @@ data.changed    (host → UI event)  → new facts recorded; the UI refreshes th
 
 ```csharp
 public interface IFactJournal { Task<int> AppendAsync(IReadOnlyList<ActivityFact> facts); Task<IReadOnlyList<ActivityFact>> ReadAsync(Interval range); Task<DateTimeOffset?> EarliestAsync(FactSource? source = null); }   // Append returns how many were new
-public interface ICoverageLog { Task BeginAsync(DateTimeOffset signedInAt); Task ExtendAsync(DateTimeOffset now); Task ResumeAsync(DateTimeOffset suspendedAt, DateTimeOffset resumedAt); Task<IReadOnlyList<CoverageSpan>> ReadAsync(Interval range); }   // Resume bridges a standby whose start and end the Recorder saw
+public interface ICoverageLog { Task<DateTimeOffset> BeginAsync(DateTimeOffset signedInAt); Task ExtendAsync(DateTimeOffset now); Task ResumeAsync(DateTimeOffset suspendedAt, DateTimeOffset resumedAt); Task<IReadOnlyList<CoverageSpan>> ReadAsync(Interval range); }   // Begin returns the coverage start: the sign-in after an autostart within 5 min, else now; Resume bridges a standby whose start and end the Recorder saw
 public interface IHistorySource { Task<HistoryBatch> ReadSinceAsync(HistoryCursor cursor, UserSid user); }   // facts + next cursor (time, session open then)
 public interface IHistoryCursorStore { Task<HistoryCursor> LoadAsync(); Task SaveAsync(HistoryCursor cursor); }
 public interface ILunchRules { Task<LunchRule> InForceOnAsync(DateOnly date); Task<LunchRule> SaveAsync(TimeRange window, IReadOnlyList<BreakTier> tiers); }
@@ -326,7 +326,7 @@ company-managed laptop, Defender attack-surface-reduction rules can block an uns
 | AC-2.2 | A video holds the display on for 30 min without input, then the idle lock comes → use ends at lock time − idle timeout ± 60 s; the lid closed after 30 min of video without input → use ends at lid time ± 60 s | FR-001, BR-003 |
 | AC-2.3 | After a cold boot the day is not marked rebuilt, its start = sign-in ± 60 s and its coverage begins at sign-in, the stretch until the Recorder started filled from history; a day with a standby at lunch is not marked rebuilt; after restart, sign-out/in and overnight standby, coverage resumes from sign-in without any action | FR-001, UC-002, BR-004, BR-011 |
 | AC-2.4 | With "require sign-in after sleep: never": standby at lunch, then input → use restarts at the first input ± 60 s; overnight Windows wakes add no use; `powercfg /requests` never lists the Recorder; its CPU averages < 0.5 % over 8 h | FR-001, BR-001, BR-002 |
-| AC-2.5 | Recorder stopped for 30 minutes → on its next start the gap is filled from history and that day is marked rebuilt | FR-002, BR-004 |
+| AC-2.5 | Recorder stopped for 30 minutes with a lock and an unlock inside → on its next start the gap is filled from history and that day is marked rebuilt; a stop during continuous use leaves the day as recorded | FR-002, BR-004 |
 | AC-2.6 | `winget validate` passes; `Tools/SandboxTest.ps1` installs the manifest in Windows Sandbox; a Defender scan of the installed folder finds nothing; `wtt-setup.exe /VERYSILENT /CURRENTUSER` installs without admin rights or a UAC prompt; upgrading in place keeps the facts; uninstalling removes the program, the `Run` value and the data folder (K3) | FR-001, UC-002 |
 | AC-2.7 | WebView2 open on the placeholder for 8 h → 0 outbound connections from the app's process tree (NFR-001 probe); a second standard user account is denied opening the data file (NFR-002) | FR-001, UC-002 |
 | AC-2.8 | Unlock 08:00, lock 12:00–13:00, lock 17:30, unlock 22:40, shutdown 22:42 → start 08:00, end 17:30, break 1:00, total 8:32; the same visit at 19:30–19:32 (last pause 2:00) → end 17:30, total 8:32; at 19:29–19:31 (last pause 1:59) → end 19:31, total 10:31 | FR-003, BR-005, BR-012 |
@@ -393,3 +393,7 @@ company-managed laptop, Defender attack-surface-reduction rules can block an uns
 | E1 | Evening pause: a last pause of 2 h or more ends the day; use after it adds only its own minutes (BR-012) | Short evening visits (wake or unlock, then shutdown) turned whole evenings into work | M1, owner | Keep (owner) |
 | W1 | A fingerprint wake counts as a person, like keyboard and mouse (BR-001) | Windows logs it under a reason code of its own, so it never counted | M1 check (QA) | Keep (owner) |
 | E2 | The day view shows the evening pause and the minutes after it | A total above end − start − break is otherwise unexplained | concept v1.3.0 | Keep (owner) |
+| S1 | A Start-menu shortcut opens the app | The way a person finds the app (UC-001) | Phase-2 installer | Keep (owner) |
+| S2 | An "Open Work Time Tracker" tick box ends an interactive install | Opens the app right away; silent installs skip it | Phase-2 installer | Keep (owner) |
+| S3 | The Recorder starts right after install and upgrade | Recording begins the same day, not at the next sign-in | Phase-2 installer | Keep (owner) |
+| S4 | The winget listing's description text | Public text a colleague reads before installing | Phase-2 winget template | Keep (owner) |

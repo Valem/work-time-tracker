@@ -19,7 +19,9 @@ network traffic that must be configured and proven silent (ADR-006).
   **Recorder** and the **App** host as `net10.0-windows`. LTS support runs to November 2028 [1].
 - **App host: Windows Forms with the WebView2 control.** The window holds one WebView2 and nothing
   else; all screens are web (ADR-006).
-- **Recorder:** a windowless process with a message-only window for session and power notifications.
+- **Recorder:** a windowless process with a hidden top-level window, never shown, for session and power
+  notifications — a message-only window would miss the end-of-session messages that sign-out, shutdown
+  and an installer's close request send.
 - **Non-baseline packages:** `Microsoft.Web.WebView2` (the control), `Microsoft.Windows.CsWin32`
   (source-generated Win32 signatures instead of hand-written P/Invoke), `System.Diagnostics.EventLog`
   (event-log reader), `Microsoft.Data.Sqlite` (ADR-004). Tests: xUnit.

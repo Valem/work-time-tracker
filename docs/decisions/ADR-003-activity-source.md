@@ -18,13 +18,15 @@ read-only checks of Windows 11 laptops (2026-10-24):
 
 ## Decision
 
-- **Live:** the Recorder (ADR-002) receives session notifications (lock, unlock, sign-in, sign-out)
-  and power notifications (suspend, resume, lid, power button); when use ends it reads the session's
-  last-input time (`GetLastInputInfo`) and stores the end's **cause** — Win+L, lid, power button,
-  sign-out, or the timer that fired (idle lock, screen-saver lock, display-off standby, machine
-  inactivity limit — managed laptops may set several) with its length. At start it records the session's
-  logon time, so coverage begins at sign-in even though autostart runs seconds later; history facts for the stretch
-  between sign-in and its own start are merged without marking the day rebuilt. Every fact keeps
+- **Live:** the Recorder (ADR-002) receives session notifications (lock, unlock, sign-in, sign-out) and
+  power notifications (suspend, resume, lid); when use ends it reads the session's last-input time
+  (`GetLastInputInfo`) and stores the end's **cause** — Win+L, lid, sign-out, or the timer that fired
+  (idle lock, screen-saver lock, display-off standby, machine inactivity limit — managed laptops may set
+  several) with its length, inferred from the idle time against the timers in force; Windows names
+  neither the timer nor the power button, so a standby nothing explains is stored as unknown. At start
+  it records the session's logon time, so coverage begins at sign-in when autostart ran within 5 minutes
+  of it — a later start leaves the stretch before it to history, marked rebuilt; history facts for the
+  stretch between sign-in and its own start are merged without marking the day rebuilt. Every fact keeps
   its instant and the local UTC offset; coverage is extended every minute.
 - **History:** `Winlogon/Operational` 811 (Sens 4/5), and from the System log Kernel-Power 506/507,
   42/107, Power-Troubleshooter 1, Kernel-General 12/13, Winlogon 7001/7002, User32 1074. Each record
