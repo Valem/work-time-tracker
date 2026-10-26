@@ -85,7 +85,7 @@ internal sealed class HistoryTranslator(TimeZoneInfo zone)
         var wokeAt = DateTimeOffset.TryParse(record["WakeTime"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var wakeTime)
             ? wakeTime
             : record.TimeCreated;
-        return InSession(record, session, FactKind.StandbyExit, StandbyReasons.WakeSource(type, text), $"{type}|{text}", wokeAt);
+        return InSession(record, session, FactKind.StandbyExit, StandbyReasons.WakeSource(type, text), StandbyReasons.WakeSourceRaw(type, text), wokeAt);
     }
 
     private ActivityFact? SensLockOrUnlock(RawEvent record, UserSid user)
