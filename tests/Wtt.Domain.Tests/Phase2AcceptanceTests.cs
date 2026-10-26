@@ -149,11 +149,12 @@ public sealed class Phase2AcceptanceTests
         Assert.True(workday.IsRebuilt);
     }
 
-    /// <summary>Unlock 08:00, lock 12:00–13:00, lock 17:30, then a short visit in the evening.</summary>
+    /// <summary>Unlock 08:00, lock 12:00–13:00, lock 17:30, then an evening visit: an unlock and a shutdown.</summary>
     private static Scenario EveningVisit(string from, string to) => new Scenario()
         .Use("2026-10-20 08:00", "2026-10-20 12:00")
         .Use("2026-10-20 13:00", "2026-10-20 17:30")
-        .Use($"2026-10-20 {from}", $"2026-10-20 {to}");
+        .Unlock($"2026-10-20 {from}")
+        .Shutdown($"2026-10-20 {to}");
 
     /// <summary>Monday 08:00–17:00 with lunch, the given evening use, then Tuesday 08:00–16:00 with lunch.</summary>
     private static Scenario EveningIntoTheNight(Func<Scenario, Scenario> evening) => evening(new Scenario()
