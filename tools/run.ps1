@@ -14,7 +14,7 @@
 .EXAMPLE
     pwsh tools/run.ps1
 .EXAMPLE
-    pwsh tools/run.ps1 -Data $env:TEMP\wtt-try        # the app keeps its web view and log in another folder
+    pwsh tools/run.ps1 -Data $env:TEMP\wtt-try        # a Recorder started here and the app keep their data in another folder
 .EXAMPLE
     pwsh tools/run.ps1 -Installer -Version 0.2.0
 .EXAMPLE
@@ -100,19 +100,20 @@ function Start-Locally {
     Invoke-Native 'Build app' { dotnet build $appProject --configuration $Configuration --nologo }
 
     $output = "bin/$Configuration/net10.0-windows"
+    $dataFolder = if ($Data) { "`"$([System.IO.Path]::GetFullPath($Data))`"" }
     if (Test-RecorderRunning) {
         Write-Host 'The Recorder already runs in this session.'
     }
     else {
-        $recorder = Join-Path $root "src/Wtt.Recorder/$output/wtt-recorder.dll"
-        Start-Process dotnet -ArgumentList "`"$recorder`"" -WindowStyle Hidden
+        $recorder = @("`"$(Join-Path $root "src/Wtt.Recorder/$output/wtt-recorder.dll")`"")
+        if ($dataFolder) { $recorder += '--data-dir', $dataFolder }
+        Start-Process dotnet -ArgumentList $recorder -WindowStyle Hidden
         Write-Host 'Recorder started.'
     }
 
-    $app = Join-Path $root "src/Wtt.App/$output/wtt.dll"
-    $arguments = @("`"$app`"")
-    if ($Data) { $arguments += '--data', "`"$([System.IO.Path]::GetFullPath($Data))`"" }
-    Start-Process dotnet -ArgumentList $arguments
+    $app = @("`"$(Join-Path $root "src/Wtt.App/$output/wtt.dll")`"")
+    if ($dataFolder) { $app += '--data', $dataFolder }
+    Start-Process dotnet -ArgumentList $app
     Write-Host 'App started.'
 }
 

@@ -6,7 +6,7 @@ public sealed class RecorderLauncherTests : IDisposable
 {
     private readonly TempFolder program = new();
     private readonly TempFolder data = new();
-    private readonly List<string> started = [];
+    private readonly List<(string Executable, IReadOnlyList<string> Arguments)> started = [];
 
     public void Dispose()
     {
@@ -33,8 +33,22 @@ public sealed class RecorderLauncherTests : IDisposable
         var outcome = Launcher(isRunning: false).EnsureRunning();
 
         Assert.Equal(RecorderLaunch.Started, outcome);
-        Assert.Equal([Path.Combine(program.Path, "wtt-recorder.exe")], started);
+        var (executable, arguments) = Assert.Single(started);
+        Assert.Equal(Path.Combine(program.Path, "wtt-recorder.exe"), executable);
+        Assert.Empty(arguments);
         Assert.False(File.Exists(ErrorLogFile));
+    }
+
+    [Fact]
+    public void A_Recorder_started_by_an_app_on_another_data_folder_records_there()
+    {
+        program.CreateFile(RecorderLauncher.ExecutableName);
+
+        var outcome = Launcher(isRunning: false, dataFolder: data.Path).EnsureRunning();
+
+        Assert.Equal(RecorderLaunch.Started, outcome);
+        var (_, arguments) = Assert.Single(started);
+        Assert.Equal(["--data-dir", data.Path], arguments);
     }
 
     [Fact]
@@ -53,8 +67,9 @@ public sealed class RecorderLauncherTests : IDisposable
         program.CreateFile(RecorderLauncher.ExecutableName);
         var launcher = new RecorderLauncher(
             () => false,
-            _ => throw new System.ComponentModel.Win32Exception(5, "Access is denied"),
+            (_, _) => throw new System.ComponentModel.Win32Exception(5, "Access is denied"),
             program.Path,
+            null,
             Logs.At(ErrorLogFile));
 
         var outcome = launcher.EnsureRunning();
@@ -71,8 +86,8 @@ public sealed class RecorderLauncherTests : IDisposable
 
     private string ErrorLogFile => Path.Combine(data.Path, "errors.log");
 
-    private RecorderLauncher Launcher(bool isRunning) =>
-        new(() => isRunning, started.Add, program.Path, Logs.At(ErrorLogFile));
+    private RecorderLauncher Launcher(bool isRunning, string? dataFolder = null) =>
+        new(() => isRunning, (executable, arguments) => started.Add((executable, arguments)), program.Path, dataFolder, Logs.At(ErrorLogFile));
 }
 
 public sealed class NamedMutexTests

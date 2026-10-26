@@ -11,14 +11,26 @@ internal enum RecorderLaunch
     Failed,
 }
 
-/// <summary>Starts the Recorder from the app's own folder when this session has none running.</summary>
-internal sealed class RecorderLauncher(Func<bool> isRunning, Action<string> start, string programFolder, ErrorLog log)
+/// <summary>
+/// Starts the Recorder from the app's own folder when this session has none running. When the app was pointed
+/// at another data folder, the Recorder it starts records there too, so a trial run never touches the
+/// person's data.
+/// </summary>
+internal sealed class RecorderLauncher(
+    Func<bool> isRunning,
+    Action<string, IReadOnlyList<string>> start,
+    string programFolder,
+    string? dataFolder,
+    ErrorLog log)
 {
     public const string MutexName = @"Local\WorkTimeTracker.Recorder";
     public const string ExecutableName = "wtt-recorder.exe";
+    public const string DataFolderOption = "--data-dir";
 
-    public static RecorderLauncher ForThisSession(string programFolder, ErrorLog log) =>
-        new(() => NamedMutex.Exists(MutexName), StartProcess, programFolder, log);
+    public static RecorderLauncher ForThisSession(string programFolder, string? dataFolder, ErrorLog log) =>
+        new(() => NamedMutex.Exists(MutexName), StartProcess, programFolder, dataFolder, log);
+
+    public IReadOnlyList<string> Arguments => dataFolder is null ? [] : [DataFolderOption, dataFolder];
 
     public RecorderLaunch EnsureRunning()
     {
@@ -36,7 +48,7 @@ internal sealed class RecorderLauncher(Func<bool> isRunning, Action<string> star
 
         try
         {
-            start(executable);
+            start(executable, Arguments);
             return RecorderLaunch.Started;
         }
         catch (Exception failure)
@@ -46,12 +58,18 @@ internal sealed class RecorderLauncher(Func<bool> isRunning, Action<string> star
         }
     }
 
-    private static void StartProcess(string executable)
+    private static void StartProcess(string executable, IReadOnlyList<string> arguments)
     {
-        using var process = Process.Start(new ProcessStartInfo(executable)
+        var startInfo = new ProcessStartInfo(executable)
         {
             UseShellExecute = false,
             WorkingDirectory = Path.GetDirectoryName(executable)!,
-        });
+        };
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo);
     }
 }
