@@ -1,4 +1,4 @@
-using Wtt.App.Diagnostics;
+using Wtt.Infrastructure.Diagnostics;
 using Wtt.App.Recording;
 using WindowsApplication = System.Windows.Forms.Application;
 
@@ -11,7 +11,7 @@ internal static class Program
     {
         var options = AppOptions.Parse(args);
         var folders = AppFolders.For(options);
-        var log = new ErrorLog(folders.ErrorLogFile, "wtt", TimeProvider.System);
+        var log = new ErrorLog(folders.ErrorLogFile, "wtt");
 
         ApplicationConfiguration.Initialize();
         WindowsApplication.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);

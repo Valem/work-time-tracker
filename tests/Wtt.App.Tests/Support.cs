@@ -1,4 +1,4 @@
-using Wtt.App.Diagnostics;
+using Wtt.Infrastructure.Diagnostics;
 
 namespace Wtt.App.Tests;
 
@@ -43,6 +43,5 @@ internal static class Logs
 {
     public static readonly DateTimeOffset SyntheticNow = new(2026, 3, 2, 9, 15, 0, TimeSpan.FromHours(1));
 
-    public static ErrorLog At(string path, long capBytes = ErrorLog.DefaultCapBytes) =>
-        new(path, "wtt", new FixedClock(SyntheticNow), capBytes);
+    public static ErrorLog At(string path) => new(path, "wtt", new FixedClock(SyntheticNow));
 }

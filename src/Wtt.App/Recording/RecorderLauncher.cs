@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Wtt.App.Diagnostics;
+using Wtt.Infrastructure.Diagnostics;
 
 namespace Wtt.App.Recording;
 

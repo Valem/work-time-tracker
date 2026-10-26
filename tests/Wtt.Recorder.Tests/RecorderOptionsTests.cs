@@ -9,9 +9,9 @@ public sealed class RecorderOptionsTests
     {
         Assert.True(RecorderOptions.TryParse([], out var options));
 
-        Assert.Equal(SqliteDatabase.DefaultDirectory, options.DataFolder);
-        Assert.Equal(Path.Combine(SqliteDatabase.DefaultDirectory, "wtt.db"), options.DataFile);
-        Assert.EndsWith(@"\WorkTimeTracker", options.DataFolder, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(SqliteDatabase.DefaultDirectory, options.Data.Path);
+        Assert.Equal(Path.Combine(SqliteDatabase.DefaultDirectory, "wtt.db"), options.Data.DataFile);
+        Assert.EndsWith(@"\WorkTimeTracker", options.Data.Path, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -21,7 +21,8 @@ public sealed class RecorderOptionsTests
 
         Assert.True(RecorderOptions.TryParse(["--data-dir", folder], out var options));
 
-        Assert.Equal(Path.Combine(folder, "wtt.db"), options.DataFile);
+        Assert.Equal(Path.Combine(folder, "wtt.db"), options.Data.DataFile);
+        Assert.Equal(Path.Combine(folder, "errors.log"), options.Data.ErrorLogFile);
     }
 
     [Theory]

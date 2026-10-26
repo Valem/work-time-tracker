@@ -33,7 +33,7 @@ internal static class RecorderApp
             return 2;
         }
 
-        var errors = new ErrorLog(Path.Combine(options.DataFolder, ErrorLog.FileName));
+        var errors = new ErrorLog(options.Data.ErrorLogFile, "wtt-recorder");
         AppDomain.CurrentDomain.UnhandledException += (_, failure) =>
             errors.Write("Recorder failed", failure.ExceptionObject as Exception ?? new InvalidOperationException("Unknown failure."));
 
@@ -124,7 +124,7 @@ internal static class RecorderApp
 
     private static LiveRecorder Compose(RecorderOptions options, IErrorLog errors, IDesktop desktop, TimeProvider clock)
     {
-        var database = SqliteDatabase.Open(options.DataFile, clock);
+        var database = SqliteDatabase.Open(options.Data.DataFile, clock);
         var journal = new SqliteFactJournal(database);
         var user = new UserSid(WindowsIdentity.GetCurrent().User?.Value ?? throw new InvalidOperationException("No Windows user."));
         var history = new HistoryImport(new HistoryInCurrentZone(), journal, new SqliteHistoryCursorStore(database));

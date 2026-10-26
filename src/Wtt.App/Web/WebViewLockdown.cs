@@ -1,5 +1,5 @@
 using Microsoft.Web.WebView2.Core;
-using Wtt.App.Diagnostics;
+using Wtt.Infrastructure.Diagnostics;
 
 namespace Wtt.App.Web;
 

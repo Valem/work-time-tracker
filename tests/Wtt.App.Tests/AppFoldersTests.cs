@@ -8,7 +8,7 @@ public sealed class AppFoldersTests
         var folders = AppFolders.For(AppOptions.Parse([]));
 
         var expected = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WorkTimeTracker");
-        Assert.Equal(expected, folders.DataFolder);
+        Assert.Equal(expected, folders.Data.Path);
         Assert.Equal(Path.Combine(expected, "errors.log"), folders.ErrorLogFile);
         Assert.Equal(Path.Combine(expected, "WebView2"), folders.WebViewDataFolder);
     }
@@ -18,7 +18,7 @@ public sealed class AppFoldersTests
     {
         var folders = AppFolders.For(AppOptions.Parse(["--data", @"C:\synthetic\data"]));
 
-        Assert.Equal(@"C:\synthetic\data", folders.DataFolder);
+        Assert.Equal(@"C:\synthetic\data", folders.Data.Path);
         Assert.Equal(@"C:\synthetic\data\WebView2", folders.WebViewDataFolder);
     }
 

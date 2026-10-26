@@ -1,6 +1,6 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
-using Wtt.App.Diagnostics;
+using Wtt.Infrastructure.Diagnostics;
 using Wtt.App.Web;
 
 namespace Wtt.App;
