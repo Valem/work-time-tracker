@@ -1,13 +1,11 @@
 # Foundation — Technical Concept
 
-**Version:** v1.2.1 — approved 2026-10-24 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.2.0 (approved)
-· **Vision:** [vision.md](../../vision.md) v1.1.0
+**Version:** v1.3.0 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.3.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.2.0
 
 ## 1. Executive Context
 
-* **Goal:** A per-user Recorder notes when the person uses the laptop, Windows' history fills the days
-  before install and any gap, and a pure domain core derives every workday and week from those facts.
-  An app shows week, day and lunch settings; one winget command installs it; nothing is sent anywhere.
+* **Goal:** A per-user Recorder notes when the person uses the laptop, Windows' history fills the days before install and any gap, and a pure domain core
+  derives every workday and week from those facts. An app shows week, day and lunch settings; one winget command installs it; nothing is sent anywhere.
 * **Series carried without redesign:** 002 corrections + non-work days, 003 overtime balance, 004
   holiday planner — each adds inputs beside the facts and screens; Recorder and facts stay untouched.
 
@@ -27,7 +25,7 @@
 |----|-------------|--------------------|
 | FR-001 | Record the person's use of the laptop automatically, across restarts, standby and sign-outs (outcomes 2, 6) | Recorder started at sign-in; session/power notifications, last input, idle timeout; facts + coverage (ADR-002, ADR-003) |
 | FR-002 | Rebuild past days from what Windows keeps, on first start and after any recording gap; such days are marked less precise (outcome 5, K1) | Idempotent import of Winlogon 811 and System events at every Recorder start and on detected gaps (ADR-003) |
-| FR-003 | Work out each day's start, end, lunch deduction and total, with the midnight split; Windows waking itself never counts (outcomes 2, 3, 8) | Pure domain core: presence timeline → workday calculator, BR-001…BR-011 |
+| FR-003 | Work out each day's start, end, lunch deduction and total, with the midnight split and a long last pause ending the day; Windows waking itself never counts (outcomes 2, 3, 8) | Pure domain core: presence timeline → workday calculator, BR-001…BR-012 |
 | FR-004 | Show a Monday-start week (each day's start, end, break, total, week total) and a day timeline that explains ignored Windows wakes and the lunch deduction (outcomes 1, 4, A1) | Preact UI in WebView2 over the bridge (ADR-006) |
 | FR-005 | Lunch window and minimum-break tiers, prefilled (P1) — the only setup (outcomes 1, 3, K4) | Lunch rules with the date they apply from (ADR-004, BR-009) |
 | FR-006 | Show whether recording runs and when it last recorded (K2) | App reads the latest coverage span |
@@ -40,24 +38,25 @@
 
 | BR | Rule |
 |----|------|
-| BR-001 | **Use starts at an unlock or a sign-in** — or, where the session resumes without a lock screen, at the first real input after resume if the laptop then stays awake more than 2 minutes. Real input in an unlocked session extends use. Beyond the Winlogon log (~7 weeks), a standby exit with a person reason (input, power button, lid) counts as an unlock only under the same 2-minute test |
+| BR-001 | **Use starts at an unlock or a sign-in** — or, where the session resumes without a lock screen, at the first real input after resume if the laptop then stays awake more than 2 minutes. Real input in an unlocked session extends use. Beyond the Winlogon log (~7 weeks), a standby exit with a person reason (input, fingerprint, power button, lid) counts as an unlock only under the same 2-minute test |
 | BR-002 | **Windows waking itself never counts:** a wake with no unlock, sign-in or qualifying input before the next standby produces no use |
-| BR-003 | **A use span ends** at a lock, standby, sign-out or shutdown; each end fact stores its cause. Live: an end caused by a timer (idle lock, screen-saver lock, display-off standby, machine inactivity limit) falls at the later of the last real input and the event's time minus the timer that fired; lid, power button, Win+L, sign-out and shutdown end at their own time. History: at the event's time, marked approximate. Idle time without a lock stays use |
+| BR-003 | **A use span ends** at a lock, standby, sign-out or shutdown; each end fact stores its cause. Live: an end caused by a timer (idle lock, screen-saver lock, display-off standby, machine inactivity limit) falls at the later of the last real input and the event's time minus the timer that fired; lid, power button, Win+L, sign-out, shutdown and a cause this version does not know end at their own time. History: at the event's time, marked approximate; a boot that finds use still open ends it at the stop time Windows logs for the unexpected shutdown (event 6008), else at the last fact before the boot. Idle time without a lock stays use |
 | BR-004 | **Sources:** inside the Recorder's coverage only live facts count; outside it, history facts — and only those inside this user's own sign-in sessions. Exception (BR-011): the stretch from sign-in to the Recorder's start is filled from history inside coverage |
-| BR-005 | **Day and midnight split:** start = first use, end = last use of the local date at the UTC offset stored with each fact. A span crossing 00:00 ends the day at 24:00 and continues the next day from 00:00. Everything between start and end is work except the night pause and lunch |
-| BR-006 | **Night pause** — only on a day that begins with use carried over midnight, i.e. its first use starts less than 60 minutes after the previous day's last use (a span crossing 00:00 is the zero-minute case); then the pause around 00:00 is work, the previous day ends at 24:00 and this day starts at 00:00, and the longest pause after 00:00 that ends before the lunch window opens is not work. On every other day the first use starts the day, as the last use ends it |
+| BR-005 | **Day and midnight split:** start = first use, end = last use of the local date at the UTC offset stored with each fact, or the start of the evening pause (BR-012). A span crossing 00:00 is the day's last use up to 24:00 and continues the next day from 00:00. Everything between start and end is work except the night pause and lunch |
+| BR-006 | **Night pause** — only on a day that begins with use carried over midnight, i.e. its first use starts less than 60 minutes after the previous day's last use (a span crossing 00:00 is the zero-minute case); then the pause around 00:00 is work, the previous day's last use runs to 24:00 and this day starts at 00:00, and the longest pause after 00:00 that ends before the lunch window opens — when none does, the longest that starts before it — is not work. On every other day the first use starts the day, as the last use or the evening pause ends it |
 | BR-007 | **Lunch:** a pause is the whole gap between two use spans, whatever lies inside (lock, standby, Windows wakes, off). The longest pause touching the lunch window, other than the night pause, is the lunch pause and is deducted whole — raised to the tier minimum when shorter |
-| BR-008 | **Tier minimum (net):** attendance = end − start − night pause; the break is the smallest value ≥ the lunch pause such that the tier for (attendance − break) is ≤ the break. A tier applies when its threshold is strictly exceeded. One more minute never lowers the total |
-| BR-009 | **Rule in force:** until the first save, every day — before and after install — uses the prefilled rule (P1); the first rule the person saves covers the days before install and applies from its own date on; each later one applies from the date it was saved (K4) |
+| BR-008 | **Tier minimum (net):** attendance = end − start − night pause + evening use (BR-012); the break is the smallest value ≥ the lunch pause such that the tier for (attendance − break) is ≤ the break; total = attendance − break. A tier applies when its threshold is strictly exceeded. With the same pauses, more attendance never lowers the total |
+| BR-009 | **Rule in force:** until the first save, every day — before and after install — uses the prefilled rule (P1); then the days before install use the last rule saved on the first save's day, the days from install to that day keep the prefilled rule, and each saved rule applies from its own date until the next (K4) |
 | BR-010 | **Week:** Monday to Sunday; week total = sum of the day totals |
 | BR-011 | **Precision:** a day whose use comes partly from history outside coverage is marked rebuilt (K1) — except the stretch from sign-in to the Recorder's start, filled from history unmarked |
+| BR-012 | **Evening pause:** the day's last pause, when it lasts 2 h or more and is neither the lunch pause nor the night pause, ends the day where it starts; the time from its end to the end of the last use — 24:00 when that use runs past midnight (BR-005, BR-006) — is evening use and adds only its own minutes. A last pause of 1:59 changes nothing |
 
 ### Traceability Matrix
 
 | Phase | FR | UC | BR |
 |-------|----|----|----|
 | Phase-1 | FR-002, FR-003 | UC-003 | BR-001…BR-011 |
-| Phase-2 | FR-001, FR-002 | UC-002, UC-003 | BR-001, BR-002, BR-003, BR-004 |
+| Phase-2 | FR-001, FR-002, FR-003 | UC-002, UC-003 | BR-001…BR-008, BR-012 |
 | Phase-3 | FR-004, FR-005, FR-006 | UC-001, UC-004, UC-005 | BR-009, BR-010, BR-011 |
 | Phase-4 | FR-001, FR-004 | UC-001 | — |
 
@@ -66,7 +65,7 @@
 All are project-wide (`docs/decisions/`), none feature-only. **Owner** = hard to undo, cost or security: the owner's at the gate.
 
 **ADR-001** [Stack](../../decisions/ADR-001-stack.md) — .NET 10 LTS C#, Windows Forms host with WebView2. **Owner** (web UI chosen).\
-**ADR-002** [Distribution](../../decisions/ADR-002-distribution.md) — per-user Inno Setup installer on GitHub Releases, listed in winget's community repository; Recorder autostart by the per-user `Run` key; unsigned at first; per-machine install as AppLocker fallback. **Owner** (channel and fallback decided; fallback used only where a target laptop's evidence shows a block; unsigned means Smart App Control blocks it until signed).\
+**ADR-002** [Distribution](../../decisions/ADR-002-distribution.md) — per-user Inno Setup installer on GitHub Releases, listed in winget's community repository; Recorder autostart by the per-user `Run` key; unsigned at first; per-machine install as AppLocker fallback. **Owner** (channel and fallback decided; fallback used only where a target laptop's evidence shows a block; unsigned means Smart App Control blocks it until signed; an enforced Defender ASR prevalence rule may block each new release until it gains reputation or IT excludes it, which signing does not settle).\
 **ADR-003** [Activity source](../../decisions/ADR-003-activity-source.md) — live Recorder first, Windows history second, live wins inside coverage.\
 **ADR-004** [Data store](../../decisions/ADR-004-data-store.md) — one SQLite file in `%LocalAppData%`; facts stored, days derived; a rule fix may change past weeks. **Owner** (decided).\
 **ADR-005** [CI](../../decisions/ADR-005-ci.md) — public GitHub repository, GitHub Actions; synthetic fixtures only in git. **Owner** (decided).\
@@ -80,12 +79,11 @@ All are project-wide (`docs/decisions/`), none feature-only. **Owner** = hard to
 classDiagram
   class ActivityFact {
     <<append-only>>
-    Instant at
-    Offset utcOffset
+    DateTimeOffset at
     FactKind kind
     FactSource source
     string sourceKey
-    string detail
+    FactDetail detail
   }
   class PresenceTimeline {
     <<derived>>
@@ -94,16 +92,18 @@ classDiagram
   }
   class LunchRule {
     <<applies from a date>>
-    LocalDate validFrom
+    DateOnly validFrom
     TimeRange window
     List~BreakTier~ tiers
   }
   class Workday {
     <<derived, never stored>>
-    LocalDate date
+    DateOnly date
     List~WorkBlock~ blocks
     Pause nightPause
     LunchDeduction lunch
+    Pause eveningPause
+    Duration eveningUse
     Duration total
     Precision precision
   }
@@ -114,13 +114,14 @@ classDiagram
   WorkWeek o-- "7" Workday
 ```
 
-Value types: `FactKind` = Unlock, Lock, SignIn, SignOut, StandbyEnter, StandbyExit, Boot, Shutdown, LastInput,
-IdleTimeout · `FactSource` = Live, WinlogonHistory, SystemHistory · `detail` = end cause or wake reason, session ·
-`CoverageSpan` (from, to) · `WorkWeek` (monday, days, total) · `UseSpan` (start, end, precision) · `Pause`
+Value types: `at` = the instant with the UTC offset in force · `FactKind` = Unlock, Lock, SignIn, SignOut, StandbyEnter, StandbyExit, Boot, Shutdown,
+LastInput, IdleTimeout · `FactSource` = Live, WinlogonHistory, SystemHistory · `FactDetail` (end cause, timer, reason name, raw reason as Windows gave it,
+session), stored as JSON · `CoverageSpan` (from, to) · `WorkWeek` (monday, days, total) · `UseSpan` (start, end, precision) · `Pause`
 (start, end, ignored wakes) · `BreakTier` (over, minimum) · `LunchDeduction` (pause, deducted, basis).\
-**Invariants:** the fact journal is append-only and deduplicated by `sourceKey`; only the Recorder
-writes live facts. Lunch rules are superseded, never edited. Workdays and weeks are a pure function of
-facts, coverage and the rules in force — recomputed on read, never stored. The Recorder knows nothing
+**Invariants:** the fact journal is append-only and deduplicated by `sourceKey`; only the Recorder writes live facts; stored facts are never rewritten.
+Infrastructure names a reason from its stored raw reason with the current mapping when facts are read (ADR-004), so a reason named later (fingerprint)
+reaches facts already stored; domain rules decide on reason names only, and the raw reason passes through the domain unread; a name or cause it does not know reads as unknown, never as an error. Lunch rules are superseded, never edited. Workdays
+and weeks are a pure function of facts, coverage and the rules in force — recomputed on read, never stored. The Recorder knows nothing
 about days; Recorder and App meet only in the database. Domain depends on nothing; application declares
 ports that infrastructure implements. 002–004 add `DayCorrection`, `DayMark`, dated `TargetHours` beside facts.
 
@@ -158,15 +159,15 @@ flowchart TB
 ```text
 src/
 ├── Wtt.Domain/          # facts, presence, workday rules — no Windows, no I/O
-├── Wtt.Application/     # queries, commands, ports (journal, coverage, history, rules, clock)
+├── Wtt.Application/     # queries, commands, ports (journal, coverage, history, cursor, rules)
 ├── Wtt.Infrastructure/  # SQLite store, event-log history reader, live session/power/input signals
 ├── Wtt.Recorder/        # headless per-user process (Run key)
 ├── Wtt.App/             # Windows Forms host, WebView2, bridge
-├── Wtt.Cli/             # self-contained CLI printing weeks (Phase-1 milestone); not installed
+├── Wtt.Cli/             # self-contained CLI printing weeks, own data file; not installed
 └── ui/                  # Preact + TypeScript (Vite, Vitest)
 installer/               # Inno Setup script, winget manifest template
-tests/                   # domain scenarios, synthetic .evtx replay, store, bridge contract
-tools/                   # wtt-check.ps1, verify.ps1, run.ps1
+tests/                   # domain scenarios, synthetic event-XML replay, store, bridge contract
+tools/                   # verify.ps1, wtt-check.ps1, run.ps1
 ```
 
 ## 4. Behavioral Specification
@@ -198,7 +199,7 @@ sequenceDiagram
   participant R as Recorder
   participant D as Data file
   W->>R: sign-in 08:10 (Run key), unlock 08:12
-  R->>D: SignIn 08:10 (logon time), Unlock; coverage every minute
+  R->>D: SignIn 08:10 (logon time), Unlock; coverage from 08:10, extended every minute
   W->>R: lock 17:32 (idle timeout 5 min)
   R->>W: last input time?
   W-->>R: 17:26
@@ -242,57 +243,53 @@ data.changed    (host → UI event)  → new facts recorded; the UI refreshes th
 ### Service Interfaces
 
 ```csharp
-public interface IFactJournal { Task AppendAsync(IReadOnlyList<ActivityFact> facts); Task<IReadOnlyList<ActivityFact>> ReadAsync(Interval range); }
-public interface ICoverageLog { Task ExtendAsync(Instant now); Task<IReadOnlyList<CoverageSpan>> ReadAsync(Interval range); }
-public interface IHistorySource { Task<HistoryBatch> ReadSinceAsync(HistoryCursor cursor, UserSid user); }   // facts + next time cursor
-public interface ILunchRules { Task<LunchRule> InForceOnAsync(LocalDate date); Task<LunchRule> SaveAsync(TimeRange window, IReadOnlyList<BreakTier> tiers); }
-public interface IPresenceBuilder { PresenceTimeline Build(Interval range, IReadOnlyList<ActivityFact> facts, IReadOnlyList<CoverageSpan> coverage); }
-public interface IWorkdayCalculator { Workday Calculate(LocalDate date, PresenceTimeline presence, LunchRule rule); }
-public interface IWorkTimeQueries { Task<WorkWeek> GetWeekAsync(LocalDate monday); Task<Workday> GetDayAsync(LocalDate date); Task<RecordingStatus> GetRecordingStatusAsync(); }
+public interface IFactJournal { Task<int> AppendAsync(IReadOnlyList<ActivityFact> facts); Task<IReadOnlyList<ActivityFact>> ReadAsync(Interval range); Task<DateTimeOffset?> EarliestAsync(FactSource? source = null); }   // Append returns how many were new
+public interface ICoverageLog { Task BeginAsync(DateTimeOffset signedInAt); Task ExtendAsync(DateTimeOffset now); Task ResumeAsync(DateTimeOffset suspendedAt, DateTimeOffset resumedAt); Task<IReadOnlyList<CoverageSpan>> ReadAsync(Interval range); }   // Resume bridges a standby whose start and end the Recorder saw
+public interface IHistorySource { Task<HistoryBatch> ReadSinceAsync(HistoryCursor cursor, UserSid user); }   // facts + next cursor (time, session open then)
+public interface IHistoryCursorStore { Task<HistoryCursor> LoadAsync(); Task SaveAsync(HistoryCursor cursor); }
+public interface ILunchRules { Task<LunchRule> InForceOnAsync(DateOnly date); Task<LunchRule> SaveAsync(TimeRange window, IReadOnlyList<BreakTier> tiers); }
+public interface IPresenceBuilder { PresenceTimeline Build(Interval range, IReadOnlyList<ActivityFact> facts, IReadOnlyList<CoverageSpan> coverage, DateTimeOffset? winlogonHistoryFrom); }
+public interface IWorkdayCalculator { Workday Calculate(DateOnly date, PresenceTimeline presence, LunchRule rule); }
+public interface IWorkTimeQueries { Task<WorkWeek> GetWeekAsync(DateOnly monday); Task<Workday> GetDayAsync(DateOnly date); Task<RecordingStatus> GetRecordingStatusAsync(); }
 ```
 
 ## 6. Implementation Strategy
 
-**Verify command:** `pwsh tools/verify.ps1` — .NET build (warnings as errors), `dotnet test`, UI type check and Vitest;
-Phase-1 names it in `CLAUDE.md` and CI. ≤ 2 review rounds per phase. ACs use window 12:00–13:30 and tiers over 5:30 → 0:15, over 7:00 → 0:30, over 9:00 → 1:00.
-Installed-build ACs run where unsigned executables run. Whether Smart App Control lets the signed `dotnet` host load our unsigned assemblies is a Phase-1 day-one check; if not, development runs in Windows Sandbox or a VM — Smart App Control is never turned off.
+**Verify command:** `pwsh tools/verify.ps1` — .NET build (warnings as errors) and `dotnet test`; Phase-3 adds the UI type check and Vitest. Named in
+`CLAUDE.md`, run by CI on every push and pull request. ≤ 2 review rounds per phase. ACs use window 12:00–13:30 and tiers over 5:30 → 0:15, over 7:00 → 0:30, over 9:00 → 1:00.
+Installed-build ACs run where unsigned executables run. Development runs through the signed `dotnet` host; Smart App Control is never turned off. On a
+company-managed laptop, Defender attack-surface-reduction rules can block an unsigned executable run from removable media, so hands-on checks there run a build made from source on that laptop.
 
 ### Cross-cutting concerns
 
 | # | Concern | Answer |
 |---|---------|--------|
-| 1, 2 | Repository, CI/CD | Phase-1 — §3 structure, .NET 10, Node LTS; verify on PR. Phase-4 — release on tag (ADR-005) |
+| 1, 2 | Repository, CI/CD | Phase-1 — §3 structure, .NET 10, package source pinned to nuget.org; verify on every push and PR; Node LTS joins with the UI in Phase-3. Phase-4 — release on tag (ADR-005) |
 | 3–5, 13 | IaC, identity, auth, cutover | Out of scope — no cloud, no accounts, greenfield; the profile's access rights protect the file |
 | 6, 7, 12 | Health, observability, operations | Phase-2 — coverage spans, Run key, App and installer restart a stopped Recorder, gaps filled from history; errors-only log in the data folder, capped at 1 MB, never sent. Phase-3 shows status (FR-006) |
 | 8, 9 | Config, data, migrations | Phase-1 — lunch rules in the data file, no secrets; forward-only migrations at open (ADR-004) |
-| 10, 11 | Integration, tests | Windows notifications and event logs, read-only (ADR-003). Tests: domain scenarios; synthetic `.evtx` replay; store on a temp file; bridge contract both sides; scripted real-laptop protocols |
+| 10, 11 | Integration, tests | Windows notifications and event logs, read-only (ADR-003). Tests: domain scenarios; synthetic Windows event XML replayed through the import; store on a temp file; bridge contract both sides; scripted real-laptop protocols |
 | 14 | Network silence, power | Phase-2 probe, Phase-3 and Phase-4 24 h runs and forced crashes (NFR-001); Phase-2 power (NFR-003) |
 
 ### Human dependencies
 
 | Dependency | Who | Gates |
 |------------|-----|-------|
-| Target-laptop evidence, `tools/wtt-check.ps1` output: Smart App Control, AppLocker/WDAC, winget, sign-in after sleep — also decides the per-machine fallback (ADR-002) | Owner | Phase-1 milestone (the unsigned CLI runs there); Phase-2 (per-user install there) |
-| Install the .NET 10 SDK and PowerShell 7 on the development laptop via winget (Node LTS and Git are present); with it, the Smart App Control day-one check | Owner | Phase-1, day one |
-| Create the public GitHub repository (ADR-005) | Owner | Phase-1 (CI) |
+| Target-laptop evidence, `tools/wtt-check.ps1` output: Smart App Control, AppLocker/WDAC, winget, sign-in after sleep — also decides the per-machine fallback (ADR-002) | Owner | Phase-2 (per-user install there) |
+| .NET 10 SDK and PowerShell 7 on each machine that builds; PowerShell 7 installs without admin rights as a .NET global tool (`dotnet tool install --global PowerShell`) | Owner | Every build |
 | Windows Sandbox enabled on the development laptop (for `SandboxTest.ps1`) | Owner | Phase-2 |
 | A GitHub account to submit to `microsoft/winget-pkgs` | Owner | Phase-4 |
 | One colleague willing to install with winget | Owner | Phase-4 |
 
 ### Phase 1: Truth from history
 
-**Goal:** The domain core, with every rule, turns Windows history into correct past days and weeks,
-stored as facts — the riskiest premise first.\
+**Goal:** The domain core, with every rule, turns Windows history into correct past days and weeks, stored as facts — the riskiest premise first.\
 **Stop point:** The target laptop's past weeks print and match memory and timesheets — or the rules change before anything is built on them.\
 **Rides along:** repository, solution, CI verify, `CLAUDE.md`, synthetic fixtures, the self-contained CLI.\
-**Milestone:** M1 — on the target laptop the owner checks the printed weeks against memory and timesheets: `.\wtt-cli.exe weeks`
-(development laptop: `dotnet <path>\Wtt.Cli.dll weeks`, or inside Windows Sandbox or a VM if the day-one check fails). Phase-2 waits until they have.\
-**Scope:** domain core facts → presence → workday → week; idempotent history import (Winlogon 811,
-System events) of this user's sessions with a time cursor; lunch rules with prefilled defaults.\
-**Constraints:** domain and application reference no Windows API and no I/O (ADR-001); real event-log
-exports stay git-ignored, CI runs synthetic fixtures only (ADR-005).\
-**References:** ADR-001 (stack), ADR-003 (activity source), ADR-004 (store), ADR-005 (CI) ·
-FR-002 (rebuild history), FR-003 (derive workday), UC-003, BR-001 to BR-011
+**Milestone:** M1 — on the target laptop the owner checks the printed weeks against memory and timesheets, with the CLI built from source on that laptop: `dotnet publish src/Wtt.Cli -c Release -r win-x64 -o artifacts\cli`, then `.\artifacts\cli\wtt-cli.exe weeks`. Phase-2 waits until they have.\
+**Scope:** domain core facts → presence → workday → week; idempotent history import (Winlogon 811, System events) of this user's sessions with a time cursor; lunch rules with prefilled defaults.\
+**Constraints:** domain and application reference no Windows API and no I/O (ADR-001); real event-log exports stay git-ignored, CI runs synthetic fixtures only (ADR-005).\
+**References:** ADR-001 (stack), ADR-003 (activity source), ADR-004 (store), ADR-005 (CI) · FR-002 (rebuild history), FR-003 (derive workday), UC-003, BR-001 to BR-011
 
 **Acceptance Criteria:**
 
@@ -314,17 +311,12 @@ FR-002 (rebuild history), FR-003 (derive workday), UC-003, BR-001 to BR-011
 
 ### Phase 2: Live recording, installed per user
 
-**Goal:** Today is recorded live within one minute by a Recorder that starts at every sign-in from a
-per-user install; the installer and its winget manifest are proven early — the riskiest outside premise.\
-**Stop point:** Recording the owner can rely on, before there is a real UI.\
-**Rides along:** Inno Setup installer, winget manifest checked early (`winget validate`, winget-pkgs `Tools/SandboxTest.ps1`, Defender scan), `tools/run.ps1`,
-App host with a placeholder page (to measure WebView2 early), coverage heartbeat, catch-up import, errors-only log.\
-**Scope:** Recorder capture of session, logon time, power, last input and idle timeout; coverage;
-import on start and on gap; install, upgrade-in-place and uninstall; App host starting a stopped Recorder.\
-**Constraints:** the Recorder holds no power request (NFR-003) and writes facts only — no day logic
-outside the domain core (ADR-003); the default per-user path needs no admin rights (ADR-002). Residual risk: winget-pkgs' antivirus "Installers Scan" may flag an unsigned autostarting executable — mitigation: SignPath signing (owner).\
-**References:** ADR-002 (distribution), ADR-003 (activity source), ADR-006 (web UI) ·
-FR-001 (record use), FR-002 (rebuild history), UC-002, UC-003, BR-001, BR-002, BR-003, BR-004
+**Goal:** Today is recorded live within one minute by a Recorder that starts at every sign-in from a per-user install; the installer and its winget manifest are proven early — the riskiest outside premise; the M1 rules (evening pause, fingerprint wake) make past and present days right.\
+**Stop point:** Recording the owner can rely on, evenings and fingerprint wakes counted as decided at M1, before there is a real UI.\
+**Rides along:** Inno Setup installer, winget manifest checked early (`winget validate`, winget-pkgs `Tools/SandboxTest.ps1`, Defender scan), `tools/run.ps1`, App host with a placeholder page (to measure WebView2 early), coverage heartbeat, catch-up import, errors-only log; the evening pause and the fingerprint wake — domain rules provable alone on synthetic days, too small for a stop point of their own.\
+**Scope:** Recorder capture of session, logon time, power, last input and idle timeout; coverage from sign-in and across a standby the Recorder saw begin and end (TD-002); import on start and on gap; stored facts readable whatever names another version wrote (TD-003, fingerprint); install, upgrade-in-place and uninstall; App host starting a stopped Recorder; BR-012 and BR-001's fingerprint reason in the domain core.\
+**Constraints:** the Recorder holds no power request (NFR-003) and writes facts only — no day logic outside the domain core (ADR-003); stored facts are never rewritten, infrastructure names reasons on read with the current mapping (ADR-004); the default per-user path needs no admin rights (ADR-002). Residual risk: winget-pkgs' antivirus "Installers Scan" may flag an unsigned autostarting executable — mitigation: SignPath signing (owner).\
+**References:** ADR-002 (distribution), ADR-003 (activity source), ADR-004 (store), ADR-006 (web UI) · FR-001 (record use), FR-002 (rebuild history), FR-003 (derive workday), UC-002, UC-003, BR-001, BR-002, BR-003, BR-004, BR-005, BR-006, BR-007, BR-008, BR-012
 
 **Acceptance Criteria:**
 
@@ -332,24 +324,27 @@ FR-001 (record use), FR-002 (rebuild history), UC-002, UC-003, BR-001, BR-002, B
 |----|----------|-----------|
 | AC-2.1 | Over 5 scripted workdays, recorded start = first unlock ± 60 s and end = last real input ± 60 s against a hand log, one end by idle auto-lock; a 45-minute lock at lunch is a 45 ± 1 minute pause | FR-001, BR-003 |
 | AC-2.2 | A video holds the display on for 30 min without input, then the idle lock comes → use ends at lock time − idle timeout ± 60 s; the lid closed after 30 min of video without input → use ends at lid time ± 60 s | FR-001, BR-003 |
-| AC-2.3 | After a cold boot the day is not marked rebuilt and its start = sign-in ± 60 s, the stretch until the Recorder started filled from history; after restart, sign-out/in and overnight standby, coverage resumes from sign-in without any action | FR-001, UC-002, BR-011 |
+| AC-2.3 | After a cold boot the day is not marked rebuilt, its start = sign-in ± 60 s and its coverage begins at sign-in, the stretch until the Recorder started filled from history; a day with a standby at lunch is not marked rebuilt; after restart, sign-out/in and overnight standby, coverage resumes from sign-in without any action | FR-001, UC-002, BR-004, BR-011 |
 | AC-2.4 | With "require sign-in after sleep: never": standby at lunch, then input → use restarts at the first input ± 60 s; overnight Windows wakes add no use; `powercfg /requests` never lists the Recorder; its CPU averages < 0.5 % over 8 h | FR-001, BR-001, BR-002 |
 | AC-2.5 | Recorder stopped for 30 minutes → on its next start the gap is filled from history and that day is marked rebuilt | FR-002, BR-004 |
 | AC-2.6 | `winget validate` passes; `Tools/SandboxTest.ps1` installs the manifest in Windows Sandbox; a Defender scan of the installed folder finds nothing; `wtt-setup.exe /VERYSILENT /CURRENTUSER` installs without admin rights or a UAC prompt; upgrading in place keeps the facts; uninstalling removes the program, the `Run` value and the data folder (K3) | FR-001, UC-002 |
 | AC-2.7 | WebView2 open on the placeholder for 8 h → 0 outbound connections from the app's process tree (NFR-001 probe); a second standard user account is denied opening the data file (NFR-002) | FR-001, UC-002 |
+| AC-2.8 | Unlock 08:00, lock 12:00–13:00, lock 17:30, unlock 22:40, shutdown 22:42 → start 08:00, end 17:30, break 1:00, total 8:32; the same visit at 19:30–19:32 (last pause 2:00) → end 17:30, total 8:32; at 19:29–19:31 (last pause 1:59) → end 19:31, total 10:31 | FR-003, BR-005, BR-012 |
+| AC-2.9 | Unlock 08:00, lock 12:15–15:00, lock 17:00 → the last pause touches the lunch window and is the lunch pause: end 17:00, break 2:45, total 6:15 | FR-003, BR-007, BR-012 |
+| AC-2.10 | Unlock 08:00, lock 15:00 → break 0:15, total 6:45; with a visit 20:00–20:20 added → end 15:00, break 0:20, total 7:00 (the evening minutes count toward the tier) | FR-003, BR-008, BR-012 |
+| AC-2.11 | Mon unlock 08:00, lock 12:00–12:30, lock 17:00, unlock 23:30, Tue lock 00:20, unlock 08:00, lock 12:00–12:30, lock 16:00 → Monday end 17:00, break 0:30, total 9:00; Tuesday starts 00:00, night pause 00:20–08:00, break 0:30, total 7:50. The same with a Mon lock 23:50 and Tue unlock 00:10 → the same two days | FR-003, BR-005, BR-006, BR-012 |
+| AC-2.12 | Beyond Winlogon coverage, a standby exit with Kernel-Power reason 44 (fingerprint) followed by 2:01 awake starts use; one back in standby after 1:59 does not; a data file holding such an exit as `Unmapped:KernelPower 44` from an earlier version gives the same days, its stored fact unchanged. A history day with use 08:00–12:00 and 13:00–17:30 from person-reason exits, then a reason-44 exit at 22:40 and a shutdown at 22:43 → end 17:30, total 8:33, marked rebuilt; shutdown at 22:42 → total 8:30 | FR-002, BR-001, BR-012 |
+| AC-2.13 | A stored end whose cause this version does not know (written by a newer Recorder) reads as unknown and ends use at its own time; the weeks still print | FR-001, BR-003 |
 
 ### Phase 3: The app
 
-**Goal:** Week view, day timeline and lunch settings run in WebView2 on live and rebuilt data, with the
-recording status shown and the whole app proven silent, crashes included.\
+**Goal:** Week view, day timeline and lunch settings run in WebView2 on live and rebuilt data, with the recording status shown and the whole app proven silent, crashes included.\
 **Stop point:** The owner reads off a real week from the app they use every day.\
 **Rides along:** bridge contract tests, UI tests, prefilled settings (P1).\
 **Milestone:** M2 — on the target laptop the owner installs the local build and uses it for a working week: `.\wtt-setup.exe /VERYSILENT /CURRENTUSER`. Phase-4 waits until they have.\
-**Scope:** the prototype's screens — week, day timeline with ignored wakes and lunch explanation (A1),
-settings with tiers; the bridge (§5); recording status; web-view lockdown and local crash reports (ADR-006).\
+**Scope:** the prototype's screens — week, day timeline with ignored wakes and lunch explanation (A1), settings with tiers; the bridge (§5); recording status; web-view lockdown and local crash reports (ADR-006).\
 **Constraints:** the UI computes nothing; every number comes from the domain core over the bridge.\
-**References:** ADR-001 (stack), ADR-004 (store), ADR-006 (web UI) · FR-004 (day/week view),
-FR-005 (lunch settings), FR-006 (recording status), UC-001, UC-004, UC-005, BR-009, BR-010, BR-011
+**References:** ADR-001 (stack), ADR-004 (store), ADR-006 (web UI) · FR-004 (day/week view), FR-005 (lunch settings), FR-006 (recording status), UC-001, UC-004, UC-005, BR-009, BR-010, BR-011
 
 **Acceptance Criteria:**
 
@@ -363,15 +358,12 @@ FR-005 (lunch settings), FR-006 (recording status), UC-001, UC-004, UC-005, BR-0
 
 ### Phase 4: Ship through winget
 
-**Goal:** A tagged release lands on GitHub and in winget's community repository; a colleague installs
-it with one command and sees their days without help; upgrades keep the data.\
+**Goal:** A tagged release lands on GitHub and in winget's community repository; a colleague installs it with one command and sees their days without help; upgrades keep the data.\
 **Stop point:** Release candidate installable with `winget install`.\
 **Rides along:** release workflow, winget submission, README install line.\
 **Milestone:** M3 — the owner installs the published release on the target laptop: `winget install <id>`. The done gate follows.\
-**Scope:** tag-built release, winget-pkgs submission and validation, install, upgrade and uninstall
-from the published package.\
-**Constraints:** no update or network code in the app (ADR-002); the release is built by CI from a tag
-(ADR-005).\
+**Scope:** tag-built release, winget-pkgs submission and validation, install, upgrade and uninstall from the published package.\
+**Constraints:** no update or network code in the app (ADR-002); the release is built by CI from a tag (ADR-005).\
 **References:** ADR-002 (distribution), ADR-005 (CI) · FR-001 (record use), FR-004 (day/week view), UC-001
 
 **Acceptance Criteria:**
@@ -398,3 +390,6 @@ from the published package.\
 | A1 | The day view explains ignored Windows wakes and the lunch deduction | The person can see why a day reads as it does | prototype, review r1 | Keep (owner) |
 | F1 | Freeze past weeks against rule fixes in updates | Typed-in weeks would never shift | review r1 | Cut (owner) |
 | B1 | Midnight bridge: work is carried over midnight when the first use after it comes less than 60 min after the last use before it; the pause between counts as work | A 23:50 lock and 00:10 unlock must not start a new day at 00:10 | coordinator, review r2 | Keep (owner) |
+| E1 | Evening pause: a last pause of 2 h or more ends the day; use after it adds only its own minutes (BR-012) | Short evening visits (wake or unlock, then shutdown) turned whole evenings into work | M1, owner | Keep (owner) |
+| W1 | A fingerprint wake counts as a person, like keyboard and mouse (BR-001) | Windows logs it under a reason code of its own, so it never counted | M1 check (QA) | Keep (owner) |
+| E2 | The day view shows the evening pause and the minutes after it | A total above end − start − break is otherwise unexplained | concept v1.3.0 | Open — owner's at the gate |

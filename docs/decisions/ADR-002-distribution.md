@@ -53,6 +53,14 @@ every sign-in, without admin rights.
   a Defender scan of the installed folder. (`winget install --manifest` needs an admin-only setting.)
 - **Residual risk:** winget-pkgs' antivirus "Installers Scan" may flag an unsigned executable that
   starts itself at sign-in. Mitigation: SignPath Foundation signing, the owner's to take.
+- **Residual risk:** on a company-managed laptop, the Defender attack-surface-reduction rule for
+  removable media blocks an unsigned executable run from USB. The installer runs the app from the local
+  disk, so it is not affected; signing would also clear it.
+- **Residual risk:** where IT enforces the attack-surface-reduction rule that blocks executables unless
+  they meet a prevalence, age or trusted-list criterion, Microsoft's cloud reputation decides, and each
+  new release may be blocked until it builds reputation. Nothing on our side reliably clears it: the
+  remedy is an IT exclusion, and signing helps only through reputation. A blocked Recorder shows as a
+  recording gap (001 K2), filled from Windows history.
 - **Unsigned:** a laptop with Smart App Control enforcing blocks the installed app until it is signed
   (development on such a laptop uses the signed `dotnet` host, never by turning Smart App Control
   off). AppLocker or WDAC rules on a managed laptop may block executables in
@@ -68,3 +76,4 @@ every sign-in, without admin rights.
 4. Run and RunOnce registry keys — https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
 5. Smart App Control FAQ — https://support.microsoft.com/windows/smart-app-control-faq-285ea03d-fa88-4d56-882e-6698afdb7003
 6. SignPath Foundation — https://signpath.org/terms
+8. Attack surface reduction rules reference and FAQ — https://learn.microsoft.com/defender-endpoint/attack-surface-reduction-rules-reference · https://learn.microsoft.com/defender-endpoint/attack-surface-reduction-faq

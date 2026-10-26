@@ -36,6 +36,11 @@ setting changes, and 002–004 add corrections, day marks, targets and planned d
 - **A rule fix shipped in an update may change past weeks** — accepted by the owner (brief decision 14).
 - **Uninstall deletes all history** older than Windows' own logs; an export (vision idea) is the later
   remedy.
+- **Facts keep Windows' raw reason; names are derived on read.** Infrastructure's read path of the
+  fact journal names each reason from its stored raw reason with the mapping of the running version,
+  so a reason named later reaches facts already stored, and a name or cause it does not know reads as
+  unknown. Stored rows are never rewritten; domain rules decide on reason names only, and the raw reason
+  passes through the domain unread.
 - A settings change never needs a data migration; the stored UTC offset keeps past days in place when
   the laptop's time zone changes.
 - **Hard to undo:** low (one versioned file).
