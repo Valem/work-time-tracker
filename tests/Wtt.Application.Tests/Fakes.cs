@@ -39,7 +39,11 @@ internal sealed class InMemoryCoverageLog : ICoverageLog
 {
     public List<CoverageSpan> Spans { get; } = [];
 
+    public Task BeginAsync(DateTimeOffset signedInAt) => throw new NotSupportedException();
+
     public Task ExtendAsync(DateTimeOffset now) => throw new NotSupportedException();
+
+    public Task ResumeAsync(DateTimeOffset suspendedAt, DateTimeOffset resumedAt) => throw new NotSupportedException();
 
     public Task<IReadOnlyList<CoverageSpan>> ReadAsync(Interval range) =>
         Task.FromResult<IReadOnlyList<CoverageSpan>>(Spans.Where(span => span.To >= range.Start && span.From < range.End).ToList());
