@@ -185,6 +185,50 @@ public sealed class LiveRecorderTests
     }
 
     [Fact]
+    public async Task Starting_in_an_unlocked_session_waits_for_the_first_real_input_after_the_start()
+    {
+        var recorder = await StartedAsync();
+        Assert.True(recorder.AwaitsInput);
+
+        await recorder.PollInputAsync();
+        Assert.True(recorder.AwaitsInput);
+
+        desktop.LastInputAt = At("2026-10-20 08:12");
+        await recorder.PollInputAsync();
+
+        Assert.False(recorder.AwaitsInput);
+        Assert.Contains(await Recorded(), fact => fact.Kind == FactKind.LastInput && fact.At == At("2026-10-20 08:12"));
+    }
+
+    [Fact]
+    public async Task Starting_in_a_locked_session_waits_for_the_unlock_not_for_input()
+    {
+        desktop.Session = desktop.Session with { Locked = true };
+
+        var recorder = await StartedAsync();
+
+        Assert.False(recorder.AwaitsInput);
+    }
+
+    [Fact]
+    public async Task A_resume_after_a_missed_suspend_notification_is_a_wake_of_its_own_and_waits_for_input()
+    {
+        var recorder = await StartedAsync();
+        desktop.LastInputAt = At("2026-10-20 12:00");
+        await recorder.OnSignalAsync(new LiveSignal(LiveSignalKind.Suspending, At("2026-10-20 12:00")));
+        await recorder.OnSignalAsync(new LiveSignal(LiveSignalKind.Resumed, At("2026-10-20 12:45")));
+        await recorder.OnSignalAsync(new LiveSignal(LiveSignalKind.Resumed, At("2026-10-20 12:45").AddSeconds(2)));
+        desktop.LastInputAt = At("2026-10-20 12:46");
+        await recorder.PollInputAsync();
+
+        await recorder.OnSignalAsync(new LiveSignal(LiveSignalKind.Resumed, At("2026-10-20 15:00")));
+
+        var exits = (await Recorded()).Where(fact => fact.Kind == FactKind.StandbyExit).Select(fact => fact.At);
+        Assert.Equal([At("2026-10-20 12:45"), At("2026-10-20 15:00")], exits);
+        Assert.True(recorder.AwaitsInput);
+    }
+
+    [Fact]
     public async Task A_resume_into_a_locked_session_waits_for_the_unlock_not_for_input()
     {
         var recorder = await StartedAsync();

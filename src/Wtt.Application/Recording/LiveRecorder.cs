@@ -26,18 +26,24 @@ public sealed class LiveRecorder(
     /// <summary>A heartbeat this soon after a suspend notification may still run before Windows actually suspends.</summary>
     private static readonly TimeSpan SuspendSettling = TimeSpan.FromSeconds(10);
 
+    /// <summary>Windows announces one wake more than once (automatic, then suspend resume) within this.</summary>
+    private static readonly TimeSpan SameWake = TimeSpan.FromSeconds(30);
+
     private SignInSession? session;
     private DateTimeOffset startedAt;
     private DateTimeOffset lastBeat;
     private DateTimeOffset? suspendedAt;
-    private bool resumeSeen;
+    private DateTimeOffset? lastResumeAt;
     private bool locked;
     private DateTimeOffset? lidClosedAt;
     private DateTimeOffset? awaitingInputSince;
     private volatile bool awaitsInput;
     private EndReason? idleLockWritten;
 
-    /// <summary>True while a resume without a lock screen waits for the first real input; read from any thread.</summary>
+    /// <summary>
+    /// True while an unlocked session the Recorder did not see begin — a resume without a lock screen, or its own
+    /// start — waits for the first real input; read from any thread.
+    /// </summary>
     public bool AwaitsInput => awaitsInput;
 
     private SignInSession Session => session ?? throw new InvalidOperationException("The Recorder has not started.");
@@ -60,6 +66,10 @@ public sealed class LiveRecorder(
             Fact(FactKind.SignIn, session.SignedInAt),
             IdleTimeoutFact(now, idleLockWritten),
         ]);
+        if (!locked)
+        {
+            AwaitInputSince(now);
+        }
     }
 
     /// <summary>Imports what Windows kept since the cursor: the days before the first start and any gap since.</summary>
@@ -144,13 +154,13 @@ public sealed class LiveRecorder(
         await EndUseAsync(FactKind.StandbyEnter, at, idle => EndReasons.ForStandby(idle, desktop.TimersInForce(), LidJustClosed(at)));
         await coverage.ExtendAsync(at);
         suspendedAt = at;
-        resumeSeen = false;
         lastBeat = at;
     }
 
     /// <summary>
     /// Windows announces a wake the person caused twice (automatic, then suspend resume); only the first counts.
-    /// A resume without a suspend seen before it is a gap in coverage.
+    /// A resume without a suspend seen before it — a missed suspend notification, which Windows follows with a
+    /// critical resume — is a wake of its own and may be a gap in coverage.
     /// </summary>
     private async Task OnResumedAsync(DateTimeOffset at)
     {
@@ -160,7 +170,7 @@ public sealed class LiveRecorder(
             await coverage.ResumeAsync(from, at);
             suspendedAt = null;
         }
-        else if (resumeSeen)
+        else if (lastResumeAt is { } previous && at - previous <= SameWake)
         {
             return;
         }
@@ -170,13 +180,12 @@ public sealed class LiveRecorder(
             await coverage.ExtendAsync(at);
         }
 
-        resumeSeen = true;
+        lastResumeAt = at;
         lastBeat = at;
         await journal.AppendAsync([Fact(FactKind.StandbyExit, at)]);
         if (!locked)
         {
-            awaitingInputSince = at;
-            awaitsInput = true;
+            AwaitInputSince(at);
         }
 
         if (gap)
@@ -240,6 +249,13 @@ public sealed class LiveRecorder(
 
     private bool LidJustClosed(DateTimeOffset at) =>
         lidClosedAt is { } closed && at - closed <= EndReasons.LidWindow && at >= closed;
+
+    /// <summary>An input the poll has not read yet stays awaited from the earlier instant.</summary>
+    private void AwaitInputSince(DateTimeOffset at)
+    {
+        awaitingInputSince ??= at;
+        awaitsInput = true;
+    }
 
     private void StopAwaitingInput()
     {

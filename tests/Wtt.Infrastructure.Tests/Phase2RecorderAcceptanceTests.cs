@@ -226,6 +226,29 @@ public sealed class Phase2RecorderAcceptanceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_Recorder_restarted_after_a_resume_without_a_lock_screen_starts_use_at_the_first_input_after_its_start()
+    {
+        await LockedOvernightAsync();
+        await rig.SignalAsync(Unlocked, "2026-10-20 08:00:00");
+        await rig.InputAsync("2026-10-20 11:59:58");
+        await rig.SignalAsync(Suspending, "2026-10-20 12:00:00");
+
+        rig.TimePassesUnseen("2026-10-20 13:00:00");
+        rig.WindowsLogs(FactKind.Lock, "2026-10-19 18:05:00");
+        rig.WindowsLogs(FactKind.Unlock, "2026-10-20 08:00:00");
+        rig.WindowsLogs(FactKind.StandbyEnter, "2026-10-20 12:00:00", FactSource.SystemHistory, "Sleep");
+        rig.WindowsLogs(FactKind.StandbyExit, "2026-10-20 12:40:00", FactSource.SystemHistory, "PowerButton");
+        await rig.StartRecorderAsync("1", signedInAt: "2026-10-19 17:59:00");
+        await rig.InputAsync("2026-10-20 13:00:30");
+        await rig.InputAsync("2026-10-20 16:59:00");
+        await rig.SignalAsync(Locked, "2026-10-20 17:00:00");
+
+        var day = await rig.DayAsync("2026-10-20");
+        Within(At("2026-10-20 17:00:00"), day.End);
+        Assert.Contains(day.Pauses, pause => pause.Start == At("2026-10-20 12:00:00") && Near(At("2026-10-20 13:00:30"), pause.End));
+    }
+
+    [Fact]
     public async Task A_day_the_Recorder_covered_whole_is_not_marked_rebuilt()
     {
         await LockedOvernightAsync();
