@@ -4,11 +4,13 @@
     <Project Path="src/Wtt.Cli/Wtt.Cli.csproj" />
     <Project Path="src/Wtt.Domain/Wtt.Domain.csproj" />
     <Project Path="src/Wtt.Infrastructure/Wtt.Infrastructure.csproj" />
+    <Project Path="src/Wtt.Recorder/Wtt.Recorder.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Wtt.Application.Tests/Wtt.Application.Tests.csproj" />
     <Project Path="tests/Wtt.Cli.Tests/Wtt.Cli.Tests.csproj" />
     <Project Path="tests/Wtt.Domain.Tests/Wtt.Domain.Tests.csproj" />
     <Project Path="tests/Wtt.Infrastructure.Tests/Wtt.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Wtt.Recorder.Tests/Wtt.Recorder.Tests.csproj" />
   </Folder>
 </Solution>
