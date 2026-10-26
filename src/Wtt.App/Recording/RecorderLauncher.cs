@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Wtt.Infrastructure;
 using Wtt.Infrastructure.Diagnostics;
 
 namespace Wtt.App.Recording;
@@ -12,9 +13,9 @@ internal enum RecorderLaunch
 }
 
 /// <summary>
-/// Starts the Recorder from the app's own folder when this session has none running. When the app was pointed
-/// at another data folder, the Recorder it starts records there too, so a trial run never touches the
-/// person's data.
+/// Starts the Recorder from the app's own folder when this session has none running on the app's data folder.
+/// When the app was pointed at another data folder, the Recorder it starts records there and holds a mutex of
+/// that folder, so a trial run never touches the person's data or recording.
 /// </summary>
 internal sealed class RecorderLauncher(
     Func<bool> isRunning,
@@ -23,12 +24,17 @@ internal sealed class RecorderLauncher(
     string? dataFolder,
     ErrorLog log)
 {
-    public const string MutexName = @"Local\WorkTimeTracker.Recorder";
     public const string ExecutableName = "wtt-recorder.exe";
     public const string DataFolderOption = "--data-dir";
 
-    public static RecorderLauncher ForThisSession(string programFolder, string? dataFolder, ErrorLog log) =>
-        new(() => NamedMutex.Exists(MutexName), StartProcess, programFolder, dataFolder, log);
+    public static RecorderLauncher ForThisSession(string programFolder, string? dataFolder, ErrorLog log)
+    {
+        var data = dataFolder is null ? DataFolder.Default : new DataFolder(dataFolder);
+        return new(() => IsRunning(data), StartProcess, programFolder, dataFolder, log);
+    }
+
+    /// <summary>Whether a Recorder on <paramref name="data"/> runs in this session.</summary>
+    public static bool IsRunning(DataFolder data) => NamedMutex.Exists(data.RecorderMutexName);
 
     public IReadOnlyList<string> Arguments => dataFolder is null ? [] : [DataFolderOption, dataFolder];
 

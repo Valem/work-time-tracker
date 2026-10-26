@@ -15,9 +15,6 @@ namespace Wtt.Recorder;
 /// </summary>
 internal static class RecorderApp
 {
-    /// <summary>The App looks for this to tell whether the Recorder runs.</summary>
-    public const string InstanceMutexName = @"Local\WorkTimeTracker.Recorder";
-
     /// <summary>Windows gives a program a few seconds at sign-out or shutdown; the last facts must be written in them.</summary>
     private static readonly TimeSpan EndSessionWait = TimeSpan.FromSeconds(4);
 
@@ -37,7 +34,7 @@ internal static class RecorderApp
         AppDomain.CurrentDomain.UnhandledException += (_, failure) =>
             errors.Write("Recorder failed", failure.ExceptionObject as Exception ?? new InvalidOperationException("Unknown failure."));
 
-        using var instance = new Mutex(initiallyOwned: true, InstanceMutexName, out var firstInstance);
+        using var instance = new Mutex(initiallyOwned: true, options.Data.RecorderMutexName, out var firstInstance);
         if (!firstInstance)
         {
             return 0;

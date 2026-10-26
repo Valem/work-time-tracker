@@ -1,4 +1,5 @@
 using Wtt.App.Recording;
+using Wtt.Infrastructure;
 
 namespace Wtt.App.Tests;
 
@@ -79,9 +80,31 @@ public sealed class RecorderLauncherTests : IDisposable
     }
 
     [Fact]
-    public void The_Recorder_is_found_by_the_shared_mutex_name()
+    public void A_Recorder_on_one_data_folder_is_never_taken_for_one_on_another()
     {
-        Assert.Equal(@"Local\WorkTimeTracker.Recorder", RecorderLauncher.MutexName);
+        var trial = new DataFolder(data.Path);
+        var other = new DataFolder(program.Path);
+
+        using (new Mutex(initiallyOwned: false, trial.RecorderMutexName))
+        {
+            Assert.True(RecorderLauncher.IsRunning(trial));
+            Assert.False(RecorderLauncher.IsRunning(other));
+        }
+
+        Assert.False(RecorderLauncher.IsRunning(trial));
+    }
+
+    [Fact]
+    public void The_persons_Recorder_holds_the_shared_name_and_a_trial_one_a_name_of_its_own()
+    {
+        var trial = new DataFolder(data.Path);
+
+        Assert.Equal(@"Local\WorkTimeTracker.Recorder", DataFolder.Default.RecorderMutexName);
+        Assert.NotEqual(DataFolder.Default.RecorderMutexName, trial.RecorderMutexName);
+        Assert.Equal(trial.RecorderMutexName, new DataFolder(data.Path.ToUpperInvariant() + Path.DirectorySeparatorChar).RecorderMutexName);
+        Assert.Equal(
+            DataFolder.Default.RecorderMutexName,
+            new DataFolder(DataFolder.Default.Path.ToLowerInvariant() + Path.DirectorySeparatorChar).RecorderMutexName);
     }
 
     private string ErrorLogFile => Path.Combine(data.Path, "errors.log");

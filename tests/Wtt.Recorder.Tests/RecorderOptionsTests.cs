@@ -34,6 +34,18 @@ public sealed class RecorderOptionsTests
         Assert.False(RecorderOptions.TryParse(args, out _));
 
     [Fact]
-    public void The_single_instance_mutex_is_per_user_session_and_named_as_agreed_with_the_App() =>
-        Assert.Equal(@"Local\WorkTimeTracker.Recorder", RecorderApp.InstanceMutexName);
+    public void The_single_instance_mutex_is_per_user_session_and_named_as_agreed_with_the_App()
+    {
+        Assert.True(RecorderOptions.TryParse([], out var options));
+
+        Assert.Equal(@"Local\WorkTimeTracker.Recorder", options.Data.RecorderMutexName);
+    }
+
+    [Fact]
+    public void A_trial_Recorder_holds_a_mutex_of_its_own_data_folder()
+    {
+        Assert.True(RecorderOptions.TryParse(["--data-dir", Path.Combine(Path.GetTempPath(), "wtt-trial")], out var options));
+
+        Assert.StartsWith(@"Local\WorkTimeTracker.Recorder.", options.Data.RecorderMutexName, StringComparison.Ordinal);
+    }
 }

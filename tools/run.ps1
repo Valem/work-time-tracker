@@ -36,7 +36,6 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $appProject = Join-Path $root 'src/Wtt.App/Wtt.App.csproj'
 $recorderProject = Join-Path $root 'src/Wtt.Recorder/Wtt.Recorder.csproj'
-$recorderMutex = 'Local\WorkTimeTracker.Recorder'
 if (-not $PublishDir) { $PublishDir = Join-Path $root 'artifacts/publish' }
 
 function Invoke-Native {
@@ -50,10 +49,24 @@ function Assert-RecorderProject {
     if (-not (Test-Path $recorderProject)) { throw "The Recorder project is missing: $recorderProject" }
 }
 
+# The Recorder's single-instance mutex, as Wtt.Infrastructure.DataFolder names it: the shared name for the
+# person's own data folder, a name of its own for any other (the first 16 hex digits of the SHA-256 of the
+# full path, without a trailing separator, upper-cased, in UTF-8).
+function Get-RecorderMutexName {
+    param([string] $DataFolder)
+    $base = 'Local\WorkTimeTracker.Recorder'
+    $normalize = { param($path) [System.IO.Path]::GetFullPath($path).TrimEnd('\', '/').ToUpperInvariant() }
+    $default = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'WorkTimeTracker'
+    if (-not $DataFolder -or (& $normalize $DataFolder) -eq (& $normalize $default)) { return $base }
+    $hash = [System.Security.Cryptography.SHA256]::HashData([System.Text.Encoding]::UTF8.GetBytes((& $normalize $DataFolder)))
+    return "$base.$([Convert]::ToHexString($hash).Substring(0, 16))"
+}
+
 function Test-RecorderRunning {
+    param([string] $DataFolder)
     $mutex = $null
     try {
-        if ([System.Threading.Mutex]::TryOpenExisting($recorderMutex, [ref] $mutex)) { $mutex.Dispose(); return $true }
+        if ([System.Threading.Mutex]::TryOpenExisting((Get-RecorderMutexName $DataFolder), [ref] $mutex)) { $mutex.Dispose(); return $true }
         return $false
     }
     catch [System.UnauthorizedAccessException] { return $true }
@@ -100,9 +113,10 @@ function Start-Locally {
     Invoke-Native 'Build app' { dotnet build $appProject --configuration $Configuration --nologo }
 
     $output = "bin/$Configuration/net10.0-windows"
-    $dataFolder = if ($Data) { "`"$([System.IO.Path]::GetFullPath($Data))`"" }
-    if (Test-RecorderRunning) {
-        Write-Host 'The Recorder already runs in this session.'
+    $dataPath = if ($Data) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Data) }
+    $dataFolder = if ($dataPath) { "`"$dataPath`"" }
+    if (Test-RecorderRunning $dataPath) {
+        Write-Host 'The Recorder already runs in this session for this data folder.'
     }
     else {
         $recorder = @("`"$(Join-Path $root "src/Wtt.Recorder/$output/wtt-recorder.dll")`"")
