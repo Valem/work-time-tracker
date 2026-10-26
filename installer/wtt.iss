@@ -89,15 +89,42 @@ function WerAddExcludedApplication(ExeName: String; AllUsers: BOOL): Integer;
 function WerRemoveExcludedApplication(ExeName: String; AllUsers: BOOL): Integer;
   external 'WerRemoveExcludedApplication@wer.dll stdcall delayload';
 
+function UserFilter(): String;
+begin
+  Result := ' /FI "USERNAME eq ' + GetUserNameString + '"';
+end;
+
+function ProgramRuns(const ExeName: String): Boolean;
+var
+  ResultCode: Integer;
+  ListFile: String;
+  Listing: AnsiString;
+begin
+  ListFile := ExpandConstant('{tmp}\running.txt');
+  Result := Exec(ExpandConstant('{cmd}'),
+      '/C ""' + ExpandConstant('{sys}\tasklist.exe') + '" /NH /FI "IMAGENAME eq ' + ExeName + '"' + UserFilter + ' > "' + ListFile + '""',
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+    and LoadStringFromFile(ListFile, Listing)
+    and (Pos(Lowercase(ExeName), Lowercase(String(Listing))) > 0);
+end;
+
 procedure StopProgram(const ExeName: String);
 var
   ResultCode: Integer;
+  Attempt: Integer;
 begin
-  { The Recorder has no top-level window to receive a close request; its facts are written in
-    transactions, so ending it is safe. Only this user's processes are touched. }
-  Exec(ExpandConstant('{sys}\taskkill.exe'),
-    '/F /IM ' + ExeName + ' /FI "USERNAME eq ' + GetUserNameString + '"',
-    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  { Asked to close first: both programs have a top-level window that ends them cleanly on WM_CLOSE (the
+    Recorder's hidden signal window writes its last coverage and pending facts). Forced only when still
+    running after 5 seconds. Only this user's processes are touched. }
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM ' + ExeName + UserFilter, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Attempt := 0;
+  while ProgramRuns(ExeName) and (Attempt < 10) do
+  begin
+    Sleep(500);
+    Attempt := Attempt + 1;
+  end;
+  if ProgramRuns(ExeName) then
+    Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM ' + ExeName + UserFilter, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
 procedure ExcludeFromErrorReporting(const Exclude: Boolean);
