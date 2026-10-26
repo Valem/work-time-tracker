@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
+# Template: installer/winget/New-WingetManifest.ps1 fills the __TOKENS__.
+
+PackageIdentifier: __PACKAGE_IDENTIFIER__
+PackageVersion: __VERSION__
+PackageLocale: en-US
+Publisher: __PUBLISHER__
+PublisherUrl: https://github.com/Valem
+PackageName: Work Time Tracker
+PackageUrl: https://github.com/Valem/work-time-tracker
+License: __LICENSE__
+ShortDescription: Works out your working time per day and week from when you use your Windows laptop.
+Description: |-
+  Work Time Tracker notes when you use your Windows 11 laptop and works out each workday's start, end,
+  lunch break and total, and each week's total, for your timesheet. Days before the install are rebuilt
+  from what Windows keeps. Everything stays on your laptop; nothing is sent over the network.
+Tags:
+  - time-tracking
+  - timesheet
+  - working-hours
+ManifestType: defaultLocale
+ManifestVersion: 1.10.0

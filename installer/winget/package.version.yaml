@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.10.0.schema.json
+# Template: installer/winget/New-WingetManifest.ps1 fills the __TOKENS__.
+
+PackageIdentifier: __PACKAGE_IDENTIFIER__
+PackageVersion: __VERSION__
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.10.0
