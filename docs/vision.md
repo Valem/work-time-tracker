@@ -1,6 +1,6 @@
 # Work Time Tracker — Vision
 
-**Version:** v1.1.0 — approved 2026-10-24
+**Version:** v1.2.0 — approved 2026-10-26
 
 ## Problem
 Keeping track of working hours by hand is effort that is easily forgotten, while the     [you]
@@ -17,7 +17,8 @@ overview and for typing them into the employer's timesheet.
 - A workday appears without anyone doing anything: start, end, break and total.         [you]
 - The day is counted as first activity → last activity, minus the lunch break: the       [you]
   longest lock or standby gap inside the person's lunch window, and at least their
-  minimum break when there is no gap or a shorter one.
+  minimum break when there is no gap or a shorter one. A pause of 2 h or more at the
+  day's end closes the day there; activity after it adds only its own minutes.
 - A week can be read off and typed into the employer's timesheet as it stands, apart    [assumed]
   from days corrected by hand.
 - A running overtime balance against each person's target hours, which stays right      [agent, kept]
