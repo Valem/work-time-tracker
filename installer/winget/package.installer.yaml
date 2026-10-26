@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+# Template: installer/winget/New-WingetManifest.ps1 fills the __TOKENS__.
+# One Inno Setup installer (ADR-002): per user by default, per machine only as the AppLocker fallback.
+
+PackageIdentifier: __PACKAGE_IDENTIFIER__
+PackageVersion: __VERSION__
+MinimumOSVersion: 10.0.22000.0
+InstallerType: inno
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+UpgradeBehavior: install
+ReleaseDate: __RELEASE_DATE__
+ProductCode: '{1D5BCBB4-EF22-42AE-B744-B03AA9CF1ACF}_is1'
+AppsAndFeaturesEntries:
+  - DisplayName: Work Time Tracker
+    Publisher: __PUBLISHER__
+    ProductCode: '{1D5BCBB4-EF22-42AE-B744-B03AA9CF1ACF}_is1'
+Installers:
+  - Architecture: x64
+    Scope: user
+    InstallerUrl: __INSTALLER_URL__
+    InstallerSha256: __INSTALLER_SHA256__
+    InstallerSwitches:
+      Custom: /CURRENTUSER
+  - Architecture: x64
+    Scope: machine
+    InstallerUrl: __INSTALLER_URL__
+    InstallerSha256: __INSTALLER_SHA256__
+    ElevationRequirement: elevationRequired
+    InstallerSwitches:
+      Custom: /ALLUSERS
+ManifestType: installer
+ManifestVersion: 1.10.0

@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    The WebView2 package also references its WPF control, whose WindowsBase clashes with the Windows Forms-only
+    app host and every project that references it.
+  -->
+  <Target Name="DropWebView2WpfControl" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+  </Target>
+</Project>
