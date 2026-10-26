@@ -392,4 +392,4 @@ company-managed laptop, Defender attack-surface-reduction rules can block an uns
 | B1 | Midnight bridge: work is carried over midnight when the first use after it comes less than 60 min after the last use before it; the pause between counts as work | A 23:50 lock and 00:10 unlock must not start a new day at 00:10 | coordinator, review r2 | Keep (owner) |
 | E1 | Evening pause: a last pause of 2 h or more ends the day; use after it adds only its own minutes (BR-012) | Short evening visits (wake or unlock, then shutdown) turned whole evenings into work | M1, owner | Keep (owner) |
 | W1 | A fingerprint wake counts as a person, like keyboard and mouse (BR-001) | Windows logs it under a reason code of its own, so it never counted | M1 check (QA) | Keep (owner) |
-| E2 | The day view shows the evening pause and the minutes after it | A total above end − start − break is otherwise unexplained | concept v1.3.0 | Open — owner's at the gate |
+| E2 | The day view shows the evening pause and the minutes after it | A total above end − start − break is otherwise unexplained | concept v1.3.0 | Keep (owner) |
