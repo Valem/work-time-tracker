@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Wtt.Application.Ports;
 using Wtt.Domain.Facts;
 using Wtt.Domain.Time;
+using Wtt.Infrastructure.History;
 
 namespace Wtt.Infrastructure.Storage;
 
@@ -53,12 +54,13 @@ public sealed class SqliteFactJournal(SqliteDatabase database) : IFactJournal
         using var reader = query.ExecuteReader();
         while (reader.Read())
         {
+            var source = Enum.Parse<FactSource>(reader.GetString(3));
             facts.Add(new ActivityFact(
                 Instant(reader.GetInt64(0), reader.GetInt32(1)),
                 Enum.Parse<FactKind>(reader.GetString(2)),
-                Enum.Parse<FactSource>(reader.GetString(3)),
+                source,
                 reader.GetString(4),
-                StoredJson.DecodeDetail(reader.GetString(5))));
+                StandbyReasons.NamedOnRead(source, StoredJson.DecodeDetail(reader.GetString(5)))));
         }
 
         return Task.FromResult<IReadOnlyList<ActivityFact>>(facts);

@@ -8,6 +8,9 @@ public sealed class WorkdayCalculator : IWorkdayCalculator
     /// <summary>Use resuming within this time after the previous day's last use carries work over midnight.</summary>
     public static readonly TimeSpan CarryOverLimit = TimeSpan.FromMinutes(60);
 
+    /// <summary>A last pause at least this long ends the day where it starts; use after it adds only its own minutes.</summary>
+    public static readonly TimeSpan EveningPauseMinimum = TimeSpan.FromHours(2);
+
     public Workday Calculate(DateOnly date, PresenceTimeline presence, LunchRule rule)
     {
         var pieces = DayPiece.SplitAtMidnight(presence.Uses);
@@ -23,13 +26,16 @@ public sealed class WorkdayCalculator : IWorkdayCalculator
         var carriedOut = next is not null && next.Start - today[^1].End < CarryOverLimit;
 
         var start = carriedIn ? Midnight(date, today[0].Start.Offset) : today[0].Start;
-        var end = carriedOut ? Midnight(date.AddDays(1), next!.Start.Offset) : today[^1].End;
+        var lastUseEnd = carriedOut ? Midnight(date.AddDays(1), next!.Start.Offset) : today[^1].End;
 
         var pauses = PausesBetween(today, presence.Pauses);
         var nightPause = carriedIn ? NightPause(date, pauses, rule) : null;
         var lunchPause = LunchPause(date, pauses.Where(pause => !ReferenceEquals(pause, nightPause)), rule);
+        var eveningPause = EveningPause(date, pauses, nightPause, lunchPause, rule);
 
-        var attendance = end - start - (nightPause?.Duration ?? TimeSpan.Zero);
+        var end = eveningPause?.Start ?? lastUseEnd;
+        var eveningUse = eveningPause is null ? TimeSpan.Zero : lastUseEnd - eveningPause.End;
+        var attendance = end - start - (nightPause?.Duration ?? TimeSpan.Zero) + eveningUse;
         var lunch = Deduction(rule, attendance, lunchPause);
         var precision = today.Any(piece => piece.Precision == Precision.Rebuilt) ? Precision.Rebuilt : Precision.Exact;
 
@@ -41,7 +47,9 @@ public sealed class WorkdayCalculator : IWorkdayCalculator
             lunch,
             attendance,
             attendance - lunch.Deducted,
-            precision);
+            precision,
+            eveningPause,
+            eveningUse);
     }
 
     private static DateTimeOffset Midnight(DateOnly date, TimeSpan offset) =>
@@ -81,6 +89,23 @@ public sealed class WorkdayCalculator : IWorkdayCalculator
         var windowOpens = date.ToDateTime(rule.Window.Start);
         var windowCloses = date.ToDateTime(rule.Window.End);
         return Longest(pauses.Where(pause => pause.Start.DateTime <= windowCloses && pause.End.DateTime >= windowOpens));
+    }
+
+    /// <summary>
+    /// The day's last pause, when it is long enough and neither the lunch nor the night pause, which are
+    /// chosen first. A pause ending before the lunch window opens is a morning pause, never an evening one.
+    /// </summary>
+    private static Pause? EveningPause(DateOnly date, IReadOnlyList<Pause> pauses, Pause? nightPause, Pause? lunchPause, LunchRule rule)
+    {
+        var last = pauses.LastOrDefault();
+        var windowOpens = date.ToDateTime(rule.Window.Start);
+        return last is not null
+            && last.Duration >= EveningPauseMinimum
+            && last.End.DateTime >= windowOpens
+            && !ReferenceEquals(last, nightPause)
+            && !ReferenceEquals(last, lunchPause)
+                ? last
+                : null;
     }
 
     private static Pause? Longest(IEnumerable<Pause> pauses) =>

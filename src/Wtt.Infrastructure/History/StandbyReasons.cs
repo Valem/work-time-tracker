@@ -12,6 +12,7 @@ namespace Wtt.Infrastructure.History;
 internal static partial class StandbyReasons
 {
     private const int ReasonMask = 0xFFFF;
+    private const char WakeSourceSeparator = '|';
 
     private static readonly Dictionary<int, string> KernelPowerNames = new()
     {
@@ -29,6 +30,7 @@ internal static partial class StandbyReasons
         [33] = WakeReason.InputTouchpad,
         [34] = WakeReason.InputPen,
         [36] = WakeReason.InputHid,
+        [44] = WakeReason.Fingerprint,
         [54] = WakeReason.InputTouch,
         [55] = "BatteryDrainBudgetExceeded",
     };
@@ -56,6 +58,23 @@ internal static partial class StandbyReasons
     public static string WakeSource(string? type, string? text) =>
         WakeSourceNames.FirstOrDefault(entry => text is not null && entry.Pattern.IsMatch(text)).Name
         ?? WakeReason.Unmapped($"WakeSource {type} {text}".TrimEnd());
+
+    /// <summary>How a wake source is kept as a raw reason: its type and text. A Kernel-Power reason is kept as its code.</summary>
+    public static string WakeSourceRaw(string? type, string? text) => $"{type}{WakeSourceSeparator}{text}";
+
+    /// <summary>
+    /// A System-log fact's reason, named from the raw reason Windows gave with this version's tables, so
+    /// a reason named after the fact was stored reaches it; the stored name is ignored.
+    /// </summary>
+    public static FactDetail NamedOnRead(FactSource source, FactDetail detail) =>
+        source == FactSource.SystemHistory && detail.RawReason is { } raw
+            ? detail with { Reason = FromRaw(raw) }
+            : detail;
+
+    private static string FromRaw(string raw) =>
+        raw.Split(WakeSourceSeparator, 2) is [var type, var text]
+            ? WakeSource(type, text)
+            : KernelPower(raw);
 
     [GeneratedRegex(@"\bpower\s*button\b", RegexOptions.IgnoreCase)]
     private static partial Regex PowerButtonText();
