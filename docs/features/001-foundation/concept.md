@@ -342,7 +342,7 @@ company-managed laptop, Defender attack-surface-reduction rules can block an uns
 **Stop point:** The owner reads off a real week from the app they use every day.\
 **Rides along:** bridge contract tests, UI tests, prefilled settings (P1).\
 **Milestone:** M2 — on the target laptop the owner installs the local build and uses it for a working week: `.\wtt-setup.exe /VERYSILENT /CURRENTUSER`. Phase-4 waits until they have.\
-**Scope:** the prototype's screens — week, day timeline with ignored wakes and lunch explanation (A1), settings with tiers; the bridge (§5); recording status; web-view lockdown and local crash reports (ADR-006).\
+**Scope:** the screens — week, day timeline with ignored wakes and lunch explanation (A1), settings with tiers; the bridge (§5); recording status; web-view lockdown and local crash reports (ADR-006).\
 **Constraints:** the UI computes nothing; every number comes from the domain core over the bridge.\
 **References:** ADR-001 (stack), ADR-004 (store), ADR-006 (web UI) · FR-004 (day/week view), FR-005 (lunch settings), FR-006 (recording status), UC-001, UC-004, UC-005, BR-009, BR-010, BR-011
 

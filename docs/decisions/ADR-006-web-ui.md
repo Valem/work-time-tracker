@@ -14,8 +14,8 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 
 ## Decision
 
-- **Library:** Preact with TypeScript, bundled by Vite, tested with Vitest. The coordinator's
-  clickable prototype is the starting point for the screens.
+- **Library:** Preact with TypeScript, bundled by Vite, tested with Vitest. The screens follow the
+  001 concept's descriptions (week, day timeline, settings, recording status).
 - **Serving:** the built assets ship in the install folder and load from a virtual host mapped to
   it; no dev server or remote URL in a release build.
 - **Bridge:** typed JSON request/response messages over `chrome.webview.postMessage` and
