@@ -1,6 +1,6 @@
 # Foundation — Intent Brief
 
-**Version:** v1.3.0 — approved 2026-10-26 · **Feature:** 001-foundation
+**Version:** v1.4.0 — approved 2026-10-26 · **Feature:** 001-foundation
 
 ```text
 Type:            new project (001-foundation)                                       [you]
@@ -27,7 +27,8 @@ Outcome:         1 a fresh install shows today's workday; setup is only lunch wi
                  4 week view: each day's start, end, break, total, plus the week total
                  5 on first start, past days back to what Windows still keeps appear
                  6 recording goes on across restarts and standby, untouched
-                 7 nothing is sent over the network
+                 7 the app sends nothing over the network; the browser engine's own
+                   update and time checks to Microsoft are allowed
                  8 work past midnight counts on the next day from 00:00; the pause
                    from then until the next use is not work
 Constraints:     Windows 11; target laptops may be company-managed; install without   [you]
@@ -55,3 +56,4 @@ Evidence:        target laptops' events and install policies → tools/wtt-check
 | 13 | Additions kept | Prefilled settings (11:30–14:00, example tiers); the day view explains ignored wakes and the lunch deduction | agent-introduced, you kept |
 | 14 | Freezing past weeks | Cut: a rule fix in an update may change past weeks | you |
 | 15 | Fingerprint wake | Counts as a person, like keyboard and mouse (M1) | you |
+| 16 | The browser engine's own network checks | Allowed: WebView2's update and time checks to Microsoft; the app itself sends nothing (Phase-2 check) | you |

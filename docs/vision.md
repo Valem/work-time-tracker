@@ -1,6 +1,6 @@
 # Work Time Tracker — Vision
 
-**Version:** v1.2.0 — approved 2026-10-26
+**Version:** v1.3.0 — approved 2026-10-26
 
 ## Problem
 Keeping track of working hours by hand is effort that is easily forgotten, while the     [you]
@@ -34,7 +34,8 @@ overview and for typing them into the employer's timesheet.
 - **Zero daily effort** — records itself in the background. Rules out start/stop        [you]
   buttons and daily confirmations.
 - **Data never leaves the laptop** — no cloud, no account, nothing sent anywhere.        [you]
-  Rules out sync between devices and any online service.
+  Rules out sync between devices and any online service. The browser engine that shows
+  the screens may make its own update and time checks to Microsoft; they carry no data.
 - **Free, no running cost** — no subscription, server or paid certificate. Rules out    [you]
   paid code signing; Windows may warn on first install.
 

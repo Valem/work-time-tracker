@@ -7,7 +7,7 @@
 
 The owner chose a web UI hosted in WebView2 (ADR-001). 001 needs three screens — week, day timeline,
 lunch settings — and the series adds a day-correction form (002), a balance panel (003) and a year
-planner (004). Nothing may be sent over the network (outcome 7), but WebView2 is a Chromium runtime
+planner (004). The app may send nothing over the network (outcome 7), but WebView2 is a Chromium runtime
 with its own background services, and **no documented switch silences them all** [3]; SmartScreen
 checks every navigation unless disabled [1]. Content served through a virtual-host folder mapping
 does not raise `WebResourceRequested`, so request filtering cannot be the guard [2].
@@ -30,8 +30,10 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
     are excluded from Windows Error Reporting per user (`WerAddExcludedApplication`).
 - **Runtime:** the Evergreen WebView2 runtime that ships with Windows 11; its updates are Windows'
   own (Edge Update), not the app's.
-- **Proof, not assumption:** network silence of the app's whole process tree, WebView2 children
-  included, is measured on real runs (001 concept, Phase-2 probe, Phases 3 and 4).
+- **Proof, not assumption:** the network traffic of the app's whole process tree, WebView2 children
+  included, is measured on real runs (001 concept, Phase-2 probe, Phases 3 and 4). The only connections
+  allowed are the runtime's own update and network-time checks to Microsoft (owner, after the Phase-2
+  probe found them); any other connection is a finding.
 
 ## Rejected alternatives
 
@@ -46,7 +48,7 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 ## Consequences
 
 - Two languages meet only at the bridge contract; a contract change is visible in both test suites.
-- If a runtime connection cannot be eliminated by configuration, it is a **blocker for the owner**:
+- If any other runtime connection cannot be eliminated by configuration, it is a **blocker for the owner**:
   the options then are a Fixed Version WebView2 runtime in the installer (~+150 MB, its own updates)
   or a native UI.
 - **Hard to undo:** medium — the screens are rewritten on a UI change; the core and bridge contract

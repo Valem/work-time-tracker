@@ -10,7 +10,7 @@ input time, the event logs — in a per-user background process, plus a window t
 The vision limits it to Windows 11 laptops and zero running cost. No domain skill covers a Windows
 desktop stack, so the baseline was researched (sources below). The owner chose a web UI hosted in
 WebView2 over WPF, knowing it brings two toolchains, a UI↔core bridge, heavier memory, and WebView2
-network traffic that must be configured and proven silent (ADR-006).
+network traffic that must be configured and measured (ADR-006).
 
 ## Decision
 
