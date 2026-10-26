@@ -14,12 +14,13 @@ public sealed class SqliteCoverageLog(SqliteDatabase database, TimeProvider? clo
     public Task BeginAsync(DateTimeOffset signedInAt)
     {
         var now = clock.GetUtcNow();
-        var from = DateTimeOffsetExtensions.Min(signedInAt, now);
+        var signedIn = DateTimeOffsetExtensions.Min(signedInAt, now);
         Write((latest, span) =>
         {
-            if (latest is not { } covered || covered.To < from)
+            if (latest is not { } covered || covered.To < signedIn)
             {
-                span.Insert(from, now);
+                var startedAtSignIn = now - signedIn <= ICoverageLog.MaxAutostartDelay;
+                span.Insert(startedAtSignIn ? signedIn : now, now);
             }
             else if (IsHeartbeatAfter(covered, now))
             {

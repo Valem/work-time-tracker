@@ -10,9 +10,16 @@ public interface ICoverageLog
     public static readonly TimeSpan MaxHeartbeatGap = TimeSpan.FromMinutes(2);
 
     /// <summary>
-    /// The Recorder starts in a session signed in at <paramref name="signedInAt"/>. Coverage reaches back to that
-    /// sign-in, unless this session was covered before: then only a gap shorter than <see cref="MaxHeartbeatGap"/>
-    /// is bridged, and a longer one stays uncovered for history to fill.
+    /// A first start later than this after the sign-in was not the autostart at sign-in (first install, Run entry
+    /// off, a restart by the App): the stretch before it stays uncovered, for history to fill as rebuilt.
+    /// </summary>
+    public static readonly TimeSpan MaxAutostartDelay = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// The Recorder starts in a session signed in at <paramref name="signedInAt"/>. On its first start in that
+    /// session, coverage reaches back to the sign-in when the start came within <see cref="MaxAutostartDelay"/> of
+    /// it, and begins now otherwise. When this session was covered before, only a gap shorter than
+    /// <see cref="MaxHeartbeatGap"/> is bridged, and a longer one stays uncovered for history to fill.
     /// </summary>
     Task BeginAsync(DateTimeOffset signedInAt);
 

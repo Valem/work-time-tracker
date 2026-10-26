@@ -23,6 +23,32 @@ public sealed class CoverageLogTests : IDisposable
     }
 
     [Fact]
+    public async Task A_first_start_long_after_the_sign_in_covers_only_from_the_start()
+    {
+        var coverage = Open();
+        clock.Now = At(8, 10).AddDays(3);
+
+        await coverage.BeginAsync(At(8, 10));
+
+        Assert.Equal([new CoverageSpan(clock.Now, clock.Now)], await Spans(coverage));
+    }
+
+    [Fact]
+    public async Task A_first_start_in_a_new_session_long_after_its_sign_in_leaves_the_stretch_since_the_sign_in_uncovered()
+    {
+        var coverage = Open();
+        await coverage.BeginAsync(At(8, 10));
+        await BeatUntilAsync(coverage, At(12, 0));
+
+        clock.Now = At(15, 0);
+        await coverage.BeginAsync(At(13, 0));
+
+        Assert.Equal(
+            [new CoverageSpan(At(8, 10), At(12, 0)), new CoverageSpan(At(15, 0), At(15, 0))],
+            await Spans(coverage));
+    }
+
+    [Fact]
     public async Task A_start_soon_after_the_last_heartbeat_of_the_same_session_continues_its_span()
     {
         var coverage = Open();

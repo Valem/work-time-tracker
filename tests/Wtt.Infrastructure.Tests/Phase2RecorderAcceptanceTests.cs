@@ -184,6 +184,48 @@ public sealed class Phase2RecorderAcceptanceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_first_start_days_after_the_sign_in_leaves_every_day_since_the_sign_in_rebuilt()
+    {
+        rig.TimePassesUnseen("2026-10-22 10:00:00");
+        rig.WindowsLogs(FactKind.SignIn, "2026-10-20 07:58:00", FactSource.SystemHistory);
+        rig.WindowsLogs(FactKind.Lock, "2026-10-20 17:00:00");
+        rig.WindowsLogs(FactKind.Unlock, "2026-10-21 08:00:00");
+        rig.WindowsLogs(FactKind.Lock, "2026-10-21 17:00:00");
+        rig.WindowsLogs(FactKind.Unlock, "2026-10-22 08:00:00");
+        rig.Desktop.LastInputAt = At("2026-10-22 09:59:50");
+        await rig.StartRecorderAsync("1", signedInAt: "2026-10-20 07:58:00");
+        await rig.InputAsync("2026-10-22 16:59:59");
+        await rig.SignalAsync(Locked, "2026-10-22 17:00:00");
+
+        Assert.True((await rig.DayAsync("2026-10-20")).IsRebuilt);
+        Assert.True((await rig.DayAsync("2026-10-21")).IsRebuilt);
+        Assert.True((await rig.DayAsync("2026-10-22")).IsRebuilt);
+        Assert.Equal(At("2026-10-22 10:00:00"), Assert.Single(await rig.SpansAsync()).From);
+    }
+
+    [Fact]
+    public async Task A_start_by_the_App_hours_after_a_sign_in_the_Run_entry_missed_marks_the_day_rebuilt()
+    {
+        await LockedOvernightAsync();
+        await rig.SignalAsync(Unlocked, "2026-10-20 08:00:00");
+        await rig.SignalAsync(ShuttingDown, "2026-10-20 12:00:00");
+
+        rig.TimePassesUnseen("2026-10-20 15:00:00");
+        rig.WindowsLogs(FactKind.SignIn, "2026-10-20 13:00:00", FactSource.SystemHistory);
+        rig.WindowsLogs(FactKind.Lock, "2026-10-20 14:00:00");
+        rig.WindowsLogs(FactKind.Unlock, "2026-10-20 14:10:00");
+        rig.Desktop.LastInputAt = At("2026-10-20 14:59:50");
+        await rig.StartRecorderAsync("2", signedInAt: "2026-10-20 13:00:00");
+        await rig.InputAsync("2026-10-20 16:59:59");
+        await rig.SignalAsync(Locked, "2026-10-20 17:00:00");
+
+        var day = await rig.DayAsync("2026-10-20");
+        Assert.True(day.IsRebuilt);
+        Assert.Contains(day.Pauses, pause => pause.Start == At("2026-10-20 14:00:00") && pause.End == At("2026-10-20 14:10:00"));
+        Assert.Equal(At("2026-10-20 15:00:00"), (await rig.SpansAsync())[^1].From);
+    }
+
+    [Fact]
     public async Task A_day_the_Recorder_covered_whole_is_not_marked_rebuilt()
     {
         await LockedOvernightAsync();

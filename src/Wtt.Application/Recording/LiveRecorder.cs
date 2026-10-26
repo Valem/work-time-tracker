@@ -42,7 +42,10 @@ public sealed class LiveRecorder(
 
     private SignInSession Session => session ?? throw new InvalidOperationException("The Recorder has not started.");
 
-    /// <summary>Coverage from sign-in, the sign-in and the idle lock timeout in force; <see cref="CatchUpAsync"/> follows.</summary>
+    /// <summary>
+    /// Coverage (from the sign-in when started right after it), the sign-in and the idle lock timeout in force;
+    /// <see cref="CatchUpAsync"/> follows.
+    /// </summary>
     public async Task StartAsync()
     {
         var now = clock.GetUtcNow();
