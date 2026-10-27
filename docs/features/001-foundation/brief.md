@@ -1,6 +1,6 @@
 # Foundation — Intent Brief
 
-**Version:** v1.4.0 — approved 2026-10-26 · **Feature:** 001-foundation
+**Version:** v1.4.1 — approved 2026-10-27 · **Feature:** 001-foundation
 
 ```text
 Type:            new project (001-foundation)                                       [you]
@@ -33,7 +33,7 @@ Outcome:         1 a fresh install shows today's workday; setup is only lunch wi
                    from then until the next use is not work
 Constraints:     Windows 11; target laptops may be company-managed; install without   [you]
                  admin rights preferred
-Budget:          M — ≤ 4 phases, ≤ 2 review rounds per phase, ≤ 6 FRs, concept ≤ 400  [you]
+Budget:          M — ≤ 4 phases, ≤ 2 review rounds per phase, ≤ 6 FRs, concept ≤ 450  [you]
 Evidence:        target laptops' events and install policies → tools/wtt-check.ps1    [agent]
 ```
 
@@ -57,3 +57,5 @@ Evidence:        target laptops' events and install policies → tools/wtt-check
 | 14 | Freezing past weeks | Cut: a rule fix in an update may change past weeks | you |
 | 15 | Fingerprint wake | Counts as a person, like keyboard and mouse (M1) | you |
 | 16 | The browser engine's own network checks | Allowed: WebView2's update and time checks to Microsoft; the app itself sends nothing (Phase-2 check) | you |
+| 17 | Language of the app | The app's screens are in German with Swiss formats, built so that other languages and formats can be added (open/closed); only de-CH ships | you |
+| 18 | Language of installer and listing | The installer and the winget listing stay in English; only the app is German | you |

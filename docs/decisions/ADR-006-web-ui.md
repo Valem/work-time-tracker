@@ -14,14 +14,28 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 
 ## Decision
 
-- **Library:** Preact with TypeScript, bundled by Vite; its type check runs in the verify command
-  (ADR-005). The screens follow the 001 concept's descriptions (week, day timeline, settings,
+- **Library:** Preact with TypeScript, bundled by Vite on Node LTS; its type check runs in the verify
+  command (ADR-005). The screens follow the 001 concept's descriptions (week, day timeline, settings,
   recording status).
 - **Serving:** the built assets ship in the install folder and load from a virtual host mapped to
   it; no dev server or remote URL in a release build.
 - **Bridge:** typed JSON request/response messages over `chrome.webview.postMessage` and
-  `WebMessageReceived`, one contract defined once; the host answers only known message types. No
-  host objects injected into script.
+  `WebMessageReceived`, one contract defined once — C# records and a closed set of refusal codes in
+  the App, serialized with one shared `JsonSerializerOptions` (Web defaults: camelCase, enums as
+  strings). The host answers only its own page's origin and known message types, validates every
+  payload, and refuses with a code, never a text. No host objects injected into script.
+- **Declarations:** a small in-repo build-time program, `Wtt.BridgeTypes`, runs after the App compiles,
+  reads those records, codes and serializer options, and writes the TypeScript declarations the UI
+  type check compiles against, so a drift between the two fails the verify command. It won over
+  generator packages because about ten records and one enum need no dependency, and reading the
+  serializer options themselves keeps the wire names and the declared names identical by construction.
+- **Text and formats:** in the UI, a registry of locales, each one language's texts (every screen text
+  and one per refusal code) joined with one region's formats (date, weekday, week, time, duration),
+  over the bridge's plain values — never `Intl` or a JS `Date`. The types make every locale supply all
+  of them, so adding a language or a format adds a definition and changes no screen (open/closed,
+  owner). One place in the host decides the active locale, sets the host's UI culture from it — the
+  host's own few messages come from its .NET resources — and passes its name to the UI, which looks it
+  up in the registry. 001 ships German with Swiss formats (de-CH) only, always active.
 - **Lockdown, all required:**
   - navigation outside the app host is cancelled; new windows are refused;
   - a Content-Security-Policy of `'self'` only — no remote scripts, styles, fonts or connections;
@@ -45,6 +59,8 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 | Vue, Svelte | Their own template compilers and conventions for no gain here |
 | Lit / web components | Lower-level; more hand-written state for the same screens |
 | Host objects (`AddHostObjectToScript`) | COM-visible classes, harder to version and test than plain messages |
+| Declaration generator packages (TypeGen, Reinforced.Typings, Tapper) | A dependency and its own naming configuration, which must be kept matching the serializer's, for about ten records |
+| Hand-written TypeScript declarations | A drift from the C# records would pass the type check and surface only at run time |
 
 ## Consequences
 

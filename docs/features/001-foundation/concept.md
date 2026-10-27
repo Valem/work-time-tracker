@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.5.1 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
+**Version:** v1.5.4 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.1 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
 
 ## 1. Executive Context
 
@@ -26,13 +26,14 @@
 | FR-001 | Record the person's use of the laptop automatically, across restarts, standby and sign-outs (outcomes 2, 6) | Recorder started at sign-in; session/power notifications, last input, idle timeout; facts + coverage (ADR-002, ADR-003) |
 | FR-002 | Rebuild past days from what Windows keeps, on first start and after any recording gap; such days are marked less precise (outcome 5, K1) | Idempotent import of Winlogon 811 and System events at every Recorder start and on detected gaps (ADR-003) |
 | FR-003 | Work out each day's start, end, lunch deduction and total, with the midnight split and a long last pause ending the day; Windows waking itself never counts (outcomes 2, 3, 8) | Pure domain core: presence timeline → workday calculator, BR-001…BR-012 |
-| FR-004 | Show a Monday-start week (each day's start, end, break, total, week total) and a day timeline that explains ignored Windows wakes and the lunch deduction (outcomes 1, 4, A1) | Preact UI in WebView2 over the bridge (ADR-006) |
+| FR-004 | Show a Monday-start week (each day's start, end, break, total, week total) and a day timeline that explains ignored Windows wakes, the lunch deduction and the evening pause (outcomes 1, 4, A1, E2) | Preact UI in WebView2 over the bridge (ADR-006) |
 | FR-005 | Lunch window and minimum-break tiers, prefilled (P1) — the only setup (outcomes 1, 3, K4) | Lunch rules with the date they apply from (ADR-004, BR-009) |
-| FR-006 | Show whether recording runs and when it last recorded (K2) | App reads the latest coverage span |
+| FR-006 | Show whether recording runs and when it last recorded (K2) | App reads the latest coverage span and whether this session's Recorder holds its mutex |
 | NFR-001 | No process of the app opens a network connection — WebView2 children and crash reporting included — except the WebView2 runtime's own update and time checks to Microsoft (outcome 7) | — |
 | NFR-002 | Data lives only in the person's local, non-roaming profile, readable by them only, kept until uninstall (vision limit, K3) | — |
 | NFR-003 | The Recorder never keeps the laptop awake and averages < 0.5 % CPU (outcome 6) | — |
 | NFR-004 | Installs and upgrades per user with one winget command, without admin rights; the app holds no update code (vision) | — |
+| NFR-005 | The app's texts come from one definition per language and its formats from one per region: adding a language or a format adds a definition and changes no screen or logic (open/closed). 001 ships German with Swiss formats (de-CH) only (owner) | — |
 
 ### Business Rules
 
@@ -164,6 +165,7 @@ src/
 ├── Wtt.Recorder/        # headless per-user process (Run key)
 ├── Wtt.App/             # Windows Forms host, WebView2, bridge
 ├── Wtt.Cli/             # self-contained CLI printing weeks, own data file; not installed
+├── Wtt.BridgeTypes/     # build-time: writes the bridge's TypeScript declarations into ui/; not installed
 └── ui/                  # Preact + TypeScript (Vite)
 installer/               # Inno Setup script, winget manifest template
 tests/                   # Wtt.Rules.Tests: one test per business rule · Wtt.Architecture.Tests: the dependency view
@@ -232,13 +234,34 @@ sequenceDiagram
 ### Bridge messages (UI ↔ App host, ADR-006)
 
 ```text
-week.get        { monday }         → days (start, end, break, total, rebuilt) + week total
-day.get         { date }           → blocks, pauses, night pause, lunch pause and basis, ignored wakes, rebuilt
-status.get      { }                → recording running?, last recorded instant
-lunchRule.get   { }                → rule in force today, prefilled or saved
-lunchRule.save  { window, tiers }  → saved rule and the date it applies from
-data.changed    (host → UI event)  → new facts recorded; the UI refreshes the visible view
+week.get        { monday? }        → ISO week number, previous and next Monday (null at the oldest kept fact's week and at the current week),
+                                     7 days (date, start, end, break, total, rebuilt) + week total; no monday: the current week
+day.get         { date }           → its week's Monday, start, end, blocks, pauses with ignored wakes, night pause,
+                                     lunch pause + deducted + basis, evening pause + evening use, total, rebuilt
+status.get      { }                → recording (this session's Recorder holds its mutex and coverage reached within 2 min),
+                                     last recorded as date and minutes at the laptop's current offset
+lunchRule.get   { }                → rule in force today (window, tiers), the date it applies from, prefilled or saved
+lunchRule.save  { window, tiers }  → saved rule and the date it applies from, or a refusal (nothing saved)
+any request     { id, type, payload } → { id, result } or { id, error: { code } }; the UI asks, the host never pushes
 ```
+
+- **Contract:** the C# message records and the closed set of refusal codes in `Wtt.App` are the contract, serialized with one shared
+  `JsonSerializerOptions` (Web defaults: camelCase, enums as strings). After the App compiles, `Wtt.BridgeTypes` reads those records,
+  codes and options and writes their TypeScript declarations into `src/ui` (ADR-006); the UI type check compiles against them, so a
+  field or code renamed, removed or retyped in C# fails verify.
+- **Values:** dates cross as `yyyy-MM-dd` with their ISO weekday, times as minutes from that day's midnight at the offset stored with
+  each fact (1440 = 24:00), durations as whole minutes. The host supplies navigation and calendars — previous and next, weekdays,
+  week numbers, the current offset — so the UI never steps a date or reads a clock; it only places and formats values.
+- **Text and formats (NFR-005):** one place in the host decides the active locale — de-CH, the only one in 001 — sets the host's UI
+  culture from it and passes its name in the start page's address. The UI looks that name up in a registry of locales, each a
+  language's texts (every screen text and one per refusal code) joined with a region's formats (date, weekday, week, time, duration),
+  typed so that a locale lacking any of them fails the type check. Screens take every text and format from it, never from `Intl` or
+  a JS `Date`. The host's own messages (no WebView2 runtime, a data file it cannot open, a crashed page) come from its resources.
+- **Refusals:** the host handles messages only from its own page's origin (the `WebMessageReceived` source) and of these five types,
+  off the window's thread. It refuses, with one code and nothing saved, a malformed or unknown message, a date outside 2000–2099, a
+  `monday` that is no Monday, a window not ending after it starts, more than 10 tiers, a value negative, over 24 h or not whole
+  minutes, two tiers on one threshold, and a data file it cannot read; each refusal is logged.
+- **Refresh:** every 30 s and whenever the window is shown again, the UI re-requests the status and the week or day it shows.
 
 ### Service Interfaces
 
@@ -255,8 +278,10 @@ public interface IWorkTimeQueries { Task<WorkWeek> GetWeekAsync(DateOnly monday)
 
 ## 6. Implementation Strategy
 
-**Verify command:** `pwsh tools/verify.ps1` — .NET build (warnings as errors) → `dotnet test`: one test per business rule and the architecture test → hygiene check; Phase-3 adds the UI's type check (ADR-005).
+**Verify command:** `pwsh tools/verify.ps1` — .NET build (warnings as errors) → `dotnet test`: one test per business rule and the architecture test → the UI type check (`tsc --noEmit` in `src/ui`) → hygiene check (ADR-005).
+From Phase-3 the App's build also runs `npm ci` when `node_modules` is missing or older than the lockfile and bundles `src/ui` with Vite into its output, so `dotnet publish`, `tools/run.ps1` and the installer need no step of their own; the solution's build runs `Wtt.BridgeTypes` after the App compiles (§5).
 No other tests: the QA live check proves every AC on real runs of the built programs, synthetic history replayed through the product's own importer where a scenario needs one; an AC tracing to a BR also cites the verify output.
+The App opens such a file with `wtt --data <folder>` (file `wtt.db`); as the Recorder it starts there imports that laptop's history, the fixture's dates lie before the laptop's oldest kept event.
 Named in `CLAUDE.md`, run by CI on every push and pull request. ≤ 2 review rounds per phase. ACs use window 12:00–13:30 and tiers over 5:30 → 0:15, over 7:00 → 0:30, over 9:00 → 1:00. Installed-build ACs run where unsigned executables run.
 Development runs through the signed `dotnet` host; Smart App Control is never turned off. On a company-managed laptop, Defender attack-surface-reduction rules can block an unsigned executable run from removable media, so hands-on checks there run a build made from source on that laptop.
 
@@ -264,7 +289,7 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 
 | # | Concern | Answer |
 |---|---------|--------|
-| 1, 2 | Repository, CI/CD | Phase-1 — §3 structure, .NET 10, package source pinned to nuget.org; verify on every push and PR; Node LTS joins with the UI in Phase-3. Phase-4 — release on tag (ADR-005) |
+| 1, 2 | Repository, CI/CD | Phase-1 — §3 structure, .NET 10, package source pinned to nuget.org; verify on every push and PR. Phase-3 — Node 24 LTS pinned in `src/ui/.nvmrc` (CI's setup-node reads it), registry pinned to registry.npmjs.org in `src/ui/.npmrc`, lockfile committed, `npm ci`. Phase-4 — release on tag (ADR-005) |
 | 3–5, 13 | IaC, identity, auth, cutover | Out of scope — no cloud, no accounts, greenfield; the profile's access rights protect the file |
 | 6, 7, 12 | Health, observability, operations | Phase-2 — coverage spans, Run key, App and installer restart a stopped Recorder, gaps filled from history; errors-only log in the data folder, capped at 1 MB, never sent. Phase-3 shows status (FR-006) |
 | 8, 9 | Config, data, migrations | Phase-1 — lunch rules in the data file, no secrets; forward-only migrations at open (ADR-004) |
@@ -276,7 +301,7 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 | Dependency | Who | Gates |
 |------------|-----|-------|
 | Target-laptop evidence, `tools/wtt-check.ps1` output: Smart App Control, AppLocker/WDAC, winget, sign-in after sleep — also decides the per-machine fallback (ADR-002) | Owner | Phase-2 (per-user install there) |
-| .NET 10 SDK and PowerShell 7 on each machine that builds; PowerShell 7 installs without admin rights as a .NET global tool (`dotnet tool install --global PowerShell`) | Owner | Every build |
+| .NET 10 SDK, PowerShell 7 and, from Phase-3, Node.js 24 LTS with access to registry.npmjs.org on each machine that builds, all without admin rights: PowerShell as a .NET global tool (`dotnet tool install --global PowerShell`), Node from its zip; for M2 also Inno Setup per user on the target laptop (`winget install --id JRSoftware.InnoSetup --scope user`) | Owner | Every build; M2 |
 | Windows Sandbox enabled on the development laptop (for `SandboxTest.ps1`) | Owner | Phase-2 |
 | A GitHub account to submit to `microsoft/winget-pkgs` | Owner | Phase-4 |
 | One colleague willing to install with winget | Owner | Phase-4 |
@@ -340,21 +365,26 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 
 **Goal:** Week view, day timeline and lunch settings run in WebView2 on live and rebuilt data, with the recording status shown and the whole app proven silent, crashes included.\
 **Stop point:** The owner reads off a real week from the app they use every day.\
-**Rides along:** the UI's type check in verify, prefilled settings (P1).\
-**Milestone:** M2 — on the target laptop the owner installs the local build and uses it for a working week: `.\wtt-setup.exe /VERYSILENT /CURRENTUSER`. Phase-4 waits until they have.\
-**Scope:** the screens — week, day timeline with ignored wakes and lunch explanation (A1), settings with tiers; the bridge (§5); recording status; web-view lockdown and local crash reports (ADR-006).\
-**Constraints:** the UI computes nothing; every number comes from the domain core over the bridge.\
-**References:** ADR-001 (stack), ADR-004 (store), ADR-006 (web UI) · FR-004 (day/week view), FR-005 (lunch settings), FR-006 (recording status), UC-001, UC-004, UC-005, BR-009, BR-010, BR-011
+**Rides along:** the UI's toolchain and type check in verify and CI, the bridge declarations generated from C#, prefilled settings (P1).\
+**Milestone:** M2 — on the target laptop the owner builds and installs the local build and uses it for a working week: `pwsh tools/run.ps1 -Installer`, then `.\artifacts\installer\wtt-setup.exe /VERYSILENT /CURRENTUSER`. Phase-4 waits until they have.\
+**Scope:** one window in German with Swiss formats, every text and format from the de-CH locale (NFR-005), the recording status always in view (whether it records and when it last recorded, or since when it has stopped);\
+week — Monday–Sunday rows with start, end (24:00 past midnight), break, total and rebuilt mark, the week total, previous and next week as the host supplies them from the oldest kept fact's week to the current one, opening on the current week;\
+day, opened from its row — a 00:00–24:00 timeline of work blocks and pauses with the ignored Windows wakes, the night pause, the lunch pause with what was deducted and whether the tier raised it (A1), the evening pause and the minutes after it (E2);\
+settings — lunch window and tiers (add, remove), prefilled until the first save (P1), a save showing the date it applies from (K4), an invalid entry refused with its reason (V1);\
+the bridge (§5); web-view lockdown and local crash reports (ADR-006), web messages enabled for the app's own origin only, a crashed renderer replaced by a message asking to restart the app (R1);\
+a data file that cannot be opened (newer, damaged, locked) shown as a problem naming the error log's path (D1).\
+**Constraints:** the UI computes nothing; every number comes from the domain core over the bridge, every time already at the fact's stored offset (§5); no text or format outside a locale definition (NFR-005); the Content-Security-Policy stays `'self'` only.\
+**References:** ADR-001 (stack), ADR-004 (store), ADR-005 (CI), ADR-006 (web UI) · FR-004 (day/week view), FR-005 (lunch settings), FR-006 (recording status), NFR-001 (silence), NFR-005 (locales), UC-001, UC-004, UC-005, BR-009, BR-010, BR-011
 
 **Acceptance Criteria:**
 
 | AC | Criteria | Traces To |
 |----|----------|-----------|
-| AC-3.1 | Every week shown equals the CLI's output for that week, day by day (start, end, break, total, rebuilt mark, week total) | FR-004, BR-010, BR-011 |
-| AC-3.2 | The days of AC-1.1 and AC-1.2 show the ignored Windows wakes and say which pause was deducted and whether the tier raised it | FR-004, UC-004 |
-| AC-3.3 | On a fresh Windows user account, after install and with no setup, today and the past days show under the prefilled rule; settings hold only lunch window and tiers; a save recomputes the days of BR-009 | FR-005, UC-001, BR-009 |
-| AC-3.4 | The status shows the last recorded time within 2 minutes; with the Recorder stopped it shows "not recording since …" within 2 minutes | FR-006, UC-004 |
-| AC-3.5 | 24 h with every screen used, and forced crashes of host, Recorder and renderer: no outbound connection from the app's process tree but NFR-001's exception, no queued Windows Error Report; a navigation to an outside URL is refused | FR-004, UC-004 |
+| AC-3.1 | On the installed app's own data, live and rebuilt days included, every week from the oldest kept to the current shows the same values as `wtt-cli weeks --db <the App's data file> --no-import` run in the same minute, day by day (start, end, break, total, rebuilt mark, week total; today's end and total and the current week's total within ± 1 min), in German with Swiss formats as in «Woche 43 · Mo 19.10.2026 – So 25.10.2026», «Mo 19.10.2026   08:15 – 17:00   Pause 0:45   8:00» and «Wochentotal 41:02»; after Windows' time zone moves by 6 h, every past week shows the same as before. Every text on the week, day, settings and status screens and in the host's messages is German, the product name aside, and a copy of the de-CH texts with one text removed fails verify | FR-004, NFR-005, BR-010, BR-011 |
+| AC-3.2 | In the day view, the synthetic days of AC-1.1, AC-1.2, AC-1.4 and AC-2.8 show that AC's start, end, break and total, the ignored Windows wakes at their times, the night pause, which pause was deducted as lunch and whether the tier raised it (AC-1.4: 0:30 raised to 1:00; AC-1.2: not raised), and the evening pause with the minutes after it (AC-2.8: 17:30–22:40, then 0:02) | FR-004, UC-004 |
+| AC-3.3 | On an account that never had the app, or whose app data the uninstall removed (K3), with an earlier day of attendance over 6:45 and under 9:00 and a lunch pause under 0:45 or none: after install and with no setup, settings hold only lunch window and tiers, showing 11:30–14:00 and the example tiers as prefilled, and today and the earlier days appear without any action; saving the same window with the single tier over 6:00 → 0:45 shows the date it applies from, every week then shows, without reopening, the same values as the CLI for that data file, and at least one day before install has a changed break; a window ending before it starts, or two tiers on one threshold, is refused with its reason and saves nothing | FR-005, UC-001, BR-009 |
+| AC-3.4 | With the Recorder running, the status shows that it records and a last recorded time at most 2 minutes old; after the Recorder's process is ended, within 2 minutes it shows that recording has stopped, since that time | FR-006, UC-004 |
+| AC-3.5 | On the installed release build, 24 h with the app open and each screen used at its start and its end, and crashes forced in host, Recorder and a renderer by an access violation injected from outside: no outbound connection from the app's process tree but NFR-001's exception, no Windows Error Report queued or archived for them, the renderer's dump only in the data folder's WebView2 profile, and after the renderer's crash the window asks to restart the app; only where injection into the renderer is refused are its crash, dump and message checked in a Debug build, crashed from DevTools; a link or file dropped on the window opens nothing | FR-004, NFR-001, UC-004 |
 
 ### Phase 4: Ship through winget
 
@@ -383,7 +413,7 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 | K2 | The app shows whether recording runs and when it last recorded | A stopped Recorder would silently lose days | A, B, C | Keep (owner) |
 | K3 | Raw activity times kept on the laptop until uninstall | Days recompute from them; 002–004 build on them | A, B, C | Keep (owner) |
 | K4 | Lunch-settings changes apply from that day on; past days keep their rule | Weeks already typed in must not shift | A, B, C | Keep (owner) |
-| C1 | Local diagnostic log as a user-facing item | Kept only as mechanism: errors only, capped, never sent (§6 rows 6, 7, 12) | A | Cut (coordinator) |
+| C1 | Local diagnostic log as a user-facing item | Kept only as mechanism: errors only, capped, never sent (§6 rows 6, 7, 12); the app names its path in one message (D1) | A | Cut (coordinator) |
 | C2 | Uninstall asks whether to keep the data | Not part of the brief | A | Cut (coordinator) |
 | C3 | Colleagues' event-log exports as test corpus | Their usage times would leave their laptops | B | Cut (coordinator) |
 | P1 | Prefilled settings: lunch window 11:30–14:00 and the brief's example tiers | A fresh install shows today's day before any setup | concept v1.0.0 | Keep (owner) |
@@ -397,3 +427,6 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 | S2 | An "Open Work Time Tracker" tick box ends an interactive install | Opens the app right away; silent installs skip it | Phase-2 installer | Keep (owner) |
 | S3 | The Recorder starts right after install and upgrade | Recording begins the same day, not at the next sign-in | Phase-2 installer | Keep (owner) |
 | S4 | The winget listing's description text | Public text a colleague reads before installing | Phase-2 winget template | Keep (owner) |
+| V1 | Invalid lunch settings are refused with their reason; nothing is saved | A wrong entry needs an answer, not a silent failure | Phase-3 readiness | Keep (owner) |
+| R1 | The window reloads the app after its renderer crashed | Otherwise the window stays blank | Phase-3 readiness | Cut (owner): a message asks to restart the app |
+| D1 | A data file that cannot be opened (newer, damaged, locked) shows as a problem naming the error log's path, e.g. «Details: %LocalAppData%\WorkTimeTracker\errors.log» | The person sees why nothing shows and where the details are | Phase-3 design review | Keep (owner) |
