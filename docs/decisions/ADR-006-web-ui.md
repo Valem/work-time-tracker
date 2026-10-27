@@ -14,13 +14,14 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 
 ## Decision
 
-- **Library:** Preact with TypeScript, bundled by Vite, tested with Vitest. The screens follow the
-  001 concept's descriptions (week, day timeline, settings, recording status).
+- **Library:** Preact with TypeScript, bundled by Vite; its type check runs in the verify command
+  (ADR-005). The screens follow the 001 concept's descriptions (week, day timeline, settings,
+  recording status).
 - **Serving:** the built assets ship in the install folder and load from a virtual host mapped to
   it; no dev server or remote URL in a release build.
 - **Bridge:** typed JSON request/response messages over `chrome.webview.postMessage` and
-  `WebMessageReceived`, one contract defined once and checked by tests on both sides; the host
-  answers only known message types. No host objects injected into script.
+  `WebMessageReceived`, one contract defined once; the host answers only known message types. No
+  host objects injected into script.
 - **Lockdown, all required:**
   - navigation outside the app host is cancelled; new windows are refused;
   - a Content-Security-Policy of `'self'` only — no remote scripts, styles, fonts or connections;
@@ -47,7 +48,7 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 
 ## Consequences
 
-- Two languages meet only at the bridge contract; a contract change is visible in both test suites.
+- Two languages meet only at the bridge contract.
 - If any other runtime connection cannot be eliminated by configuration, it is a **blocker for the owner**:
   the options then are a Fixed Version WebView2 runtime in the installer (~+150 MB, its own updates)
   or a native UI.

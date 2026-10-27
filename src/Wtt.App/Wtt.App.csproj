@@ -28,8 +28,4 @@
     <Content Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="Wtt.App.Tests" />
-  </ItemGroup>
-
 </Project>

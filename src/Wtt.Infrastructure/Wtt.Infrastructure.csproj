@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Wtt.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="Wtt.Rules.Tests" />
   </ItemGroup>
 
 </Project>

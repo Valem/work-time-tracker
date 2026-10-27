@@ -20,8 +20,10 @@ Invoke-Step '.NET build (warnings as errors)' { dotnet build $solution --configu
 Invoke-Step '.NET tests' { dotnet test $solution --configuration Release --no-build --nologo }
 
 # ==== UI checks hook (Phase-3) ==========================================================
-# Phase-3 adds the UI's type check and Vitest run here, as further Invoke-Step lines
+# Phase-3 adds the UI's type check here, as a further Invoke-Step line
 # (src/ui, Node LTS). Nothing else in this script or in CI needs to change for it.
 # ========================================================================================
+
+Invoke-Step 'Hygiene (public repository)' { & (Join-Path $PSScriptRoot 'check-hygiene.ps1') }
 
 Write-Host 'verify: all checks passed' -ForegroundColor Green

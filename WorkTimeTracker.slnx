@@ -8,11 +8,7 @@
     <Project Path="src/Wtt.Recorder/Wtt.Recorder.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Wtt.App.Tests/Wtt.App.Tests.csproj" />
-    <Project Path="tests/Wtt.Application.Tests/Wtt.Application.Tests.csproj" />
-    <Project Path="tests/Wtt.Cli.Tests/Wtt.Cli.Tests.csproj" />
-    <Project Path="tests/Wtt.Domain.Tests/Wtt.Domain.Tests.csproj" />
-    <Project Path="tests/Wtt.Infrastructure.Tests/Wtt.Infrastructure.Tests.csproj" />
-    <Project Path="tests/Wtt.Recorder.Tests/Wtt.Recorder.Tests.csproj" />
+    <Project Path="tests/Wtt.Architecture.Tests/Wtt.Architecture.Tests.csproj" />
+    <Project Path="tests/Wtt.Rules.Tests/Wtt.Rules.Tests.csproj" />
   </Folder>
 </Solution>

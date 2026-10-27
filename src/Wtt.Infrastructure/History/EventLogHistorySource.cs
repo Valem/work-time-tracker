@@ -18,6 +18,14 @@ public sealed class EventLogHistorySource : IHistorySource
     {
     }
 
+    /// <summary>
+    /// History from a file of Windows event XML instead of the live logs, imported exactly as the live logs are: for
+    /// replaying synthetic history through the product's own importer (developer CLI). The file is read and checked here.
+    /// </summary>
+    /// <exception cref="EventFileException">The file cannot be read or is not event XML.</exception>
+    public static EventLogHistorySource FromXmlFile(string path, TimeZoneInfo zone) =>
+        new(XmlFileEventRecordReader.Load(path), zone);
+
     internal EventLogHistorySource(IEventRecordReader reader, TimeZoneInfo zone)
     {
         this.reader = reader;

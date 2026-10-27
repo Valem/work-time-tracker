@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.4.0 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
+**Version:** v1.5.0 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
 
 ## 1. Executive Context
 
@@ -38,9 +38,9 @@
 
 | BR | Rule |
 |----|------|
-| BR-001 | **Use starts at an unlock or a sign-in** — or, where the session resumes without a lock screen, at the first real input after resume if the laptop then stays awake more than 2 minutes. Real input in an unlocked session extends use. Beyond the Winlogon log (~7 weeks), a standby exit with a person reason (input, fingerprint, power button, lid) counts as an unlock only under the same 2-minute test |
+| BR-001 | **Use starts at an unlock or a sign-in** — or, where the session resumes without a lock screen, at the first real input after resume if the laptop then stays awake and unlocked more than 2 minutes. Real input in an unlocked session extends use. Beyond the Winlogon log (~7 weeks), a standby exit with a person reason (input, fingerprint, power button, lid) counts as an unlock only under the same 2-minute test |
 | BR-002 | **Windows waking itself never counts:** a wake with no unlock, sign-in or qualifying input before the next standby produces no use |
-| BR-003 | **A use span ends** at a lock, standby, sign-out or shutdown; each end fact stores its cause. Live: an end caused by a timer (idle lock, screen-saver lock, display-off standby, machine inactivity limit) falls at the later of the last real input and the event's time minus the timer that fired; lid, power button, Win+L, sign-out, shutdown and a cause this version does not know end at their own time. History: at the event's time, marked approximate; a boot that finds use still open ends it at the stop time Windows logs for the unexpected shutdown (event 6008), else at the last fact before the boot. Idle time without a lock stays use |
+| BR-003 | **A use span ends** at a lock, standby, sign-out or shutdown; each live end fact stores its cause. Live: an end caused by a timer (idle lock, screen-saver lock, display-off standby, machine inactivity limit) falls at the later of the last real input and the event's time minus the timer that fired; lid, power button, Win+L, sign-out, shutdown and a cause this version does not know end at their own time. History: at the event's time, marked approximate; a boot that finds use still open ends it at the stop time Windows logs for the unexpected shutdown (event 6008), else at the last fact before the boot. Idle time without a lock stays use |
 | BR-004 | **Sources:** inside the Recorder's coverage only live facts count; outside it, history facts — and only those inside this user's own sign-in sessions. Exception (BR-011): the stretch from sign-in to the Recorder's start is filled from history inside coverage |
 | BR-005 | **Day and midnight split:** start = first use, end = last use of the local date at the UTC offset stored with each fact, or the start of the evening pause (BR-012). A span crossing 00:00 is the day's last use up to 24:00 and continues the next day from 00:00. Everything between start and end is work except the night pause and lunch |
 | BR-006 | **Night pause** — only on a day that begins with use carried over midnight, i.e. its first use starts less than 60 minutes after the previous day's last use (a span crossing 00:00 is the zero-minute case); then the pause around 00:00 is work, the previous day's last use runs to 24:00 and this day starts at 00:00, and the longest pause after 00:00 that ends before the lunch window opens — when none does, the longest that starts before it — is not work. On every other day the first use starts the day, as the last use or the evening pause ends it |
@@ -48,7 +48,7 @@
 | BR-008 | **Tier minimum (net):** attendance = end − start − night pause + evening use (BR-012); the break is the smallest value ≥ the lunch pause such that the tier for (attendance − break) is ≤ the break; total = attendance − break. A tier applies when its threshold is strictly exceeded. With the same pauses, more attendance never lowers the total |
 | BR-009 | **Rule in force:** until the first save, every day — before and after install — uses the prefilled rule (P1); then the days before install use the last rule saved on the first save's day, the days from install to that day keep the prefilled rule, and each saved rule applies from its own date until the next (K4) |
 | BR-010 | **Week:** Monday to Sunday; week total = sum of the day totals |
-| BR-011 | **Precision:** a day whose use comes partly from history outside coverage is marked rebuilt (K1) — except the stretch from sign-in to the Recorder's start, filled from history unmarked |
+| BR-011 | **Precision:** a day whose use comes partly from history outside coverage is marked rebuilt (K1) — except the stretch from sign-in to the Recorder's start when the Recorder starts within 5 minutes of the sign-in, filled from history unmarked |
 | BR-012 | **Evening pause:** the day's last pause, when it lasts 2 h or more and is neither the lunch pause nor the night pause, ends the day where it starts; the time from its end to the end of the last use — 24:00 when that use runs past midnight (BR-005, BR-006) — is evening use and adds only its own minutes. A last pause ending before the lunch window opens is a morning pause and stays work. A last pause of 1:59 changes nothing |
 
 ### Traceability Matrix
@@ -68,8 +68,8 @@ All are project-wide (`docs/decisions/`), none feature-only. **Owner** = hard to
 **ADR-002** [Distribution](../../decisions/ADR-002-distribution.md) — per-user Inno Setup installer on GitHub Releases, listed in winget's community repository; Recorder autostart by the per-user `Run` key; unsigned at first; per-machine install as AppLocker fallback. **Owner** (channel and fallback decided; fallback used only where a target laptop's evidence shows a block; unsigned means Smart App Control blocks it until signed; an enforced Defender ASR prevalence rule may block each new release until it gains reputation or IT excludes it, which signing does not settle).\
 **ADR-003** [Activity source](../../decisions/ADR-003-activity-source.md) — live Recorder first, Windows history second, live wins inside coverage.\
 **ADR-004** [Data store](../../decisions/ADR-004-data-store.md) — one SQLite file in `%LocalAppData%`; facts stored, days derived; a rule fix may change past weeks. **Owner** (decided).\
-**ADR-005** [CI](../../decisions/ADR-005-ci.md) — public GitHub repository, GitHub Actions; synthetic fixtures only in git. **Owner** (decided).\
-**ADR-006** [Web UI](../../decisions/ADR-006-web-ui.md) — Preact + TypeScript (Vite, Vitest), JSON message bridge, locked-down WebView2, local crash reports, silence measured. **Owner** (fallback is the owner's if silence fails).
+**ADR-005** [CI](../../decisions/ADR-005-ci.md) — public GitHub repository, GitHub Actions; verify = build, one test per business rule, the architecture test, hygiene check; synthetic fixtures only in git. **Owner** (decided).\
+**ADR-006** [Web UI](../../decisions/ADR-006-web-ui.md) — Preact + TypeScript (Vite), JSON message bridge, locked-down WebView2, local crash reports, silence measured. **Owner** (fallback is the owner's if silence fails).
 
 ## 3. Static Architecture
 
@@ -122,8 +122,8 @@ session), stored as JSON · `CoverageSpan` (from, to) · `WorkWeek` (monday, day
 Infrastructure names a reason from its stored raw reason with the current mapping when facts are read (ADR-004), so a reason named later (fingerprint)
 reaches facts already stored; domain rules decide on reason names only, and the raw reason passes through the domain unread; a name or cause it does not know reads as unknown, never as an error. Lunch rules are superseded, never edited. Workdays
 and weeks are a pure function of facts, coverage and the rules in force — recomputed on read, never stored. The Recorder knows nothing
-about days; Recorder and App meet only in the database. Domain depends on nothing; application declares
-ports that infrastructure implements. 002–004 add `DayCorrection`, `DayMark`, dated `TargetHours` beside facts.
+about days; Recorder and App meet only in the database. Domain depends on nothing; application declares ports that infrastructure implements;
+Domain and Application reference neither Windows nor I/O — the architecture test enforces this view, with negative probes. 002–004 add `DayCorrection`, `DayMark`, dated `TargetHours` beside facts.
 
 ### Component Diagram
 
@@ -164,10 +164,10 @@ src/
 ├── Wtt.Recorder/        # headless per-user process (Run key)
 ├── Wtt.App/             # Windows Forms host, WebView2, bridge
 ├── Wtt.Cli/             # self-contained CLI printing weeks, own data file; not installed
-└── ui/                  # Preact + TypeScript (Vite, Vitest)
+└── ui/                  # Preact + TypeScript (Vite)
 installer/               # Inno Setup script, winget manifest template
-tests/                   # domain scenarios, synthetic event-XML replay, store, bridge contract
-tools/                   # verify.ps1, wtt-check.ps1, run.ps1
+tests/                   # Wtt.Rules.Tests: one test per business rule · Wtt.Architecture.Tests: the dependency view
+tools/                   # verify.ps1, check-hygiene.ps1, wtt-check.ps1, run.ps1
 ```
 
 ## 4. Behavioral Specification
@@ -255,10 +255,10 @@ public interface IWorkTimeQueries { Task<WorkWeek> GetWeekAsync(DateOnly monday)
 
 ## 6. Implementation Strategy
 
-**Verify command:** `pwsh tools/verify.ps1` — .NET build (warnings as errors) and `dotnet test`; Phase-3 adds the UI type check and Vitest. Named in
-`CLAUDE.md`, run by CI on every push and pull request. ≤ 2 review rounds per phase. ACs use window 12:00–13:30 and tiers over 5:30 → 0:15, over 7:00 → 0:30, over 9:00 → 1:00.
-Installed-build ACs run where unsigned executables run. Development runs through the signed `dotnet` host; Smart App Control is never turned off. On a
-company-managed laptop, Defender attack-surface-reduction rules can block an unsigned executable run from removable media, so hands-on checks there run a build made from source on that laptop.
+**Verify command:** `pwsh tools/verify.ps1` — .NET build (warnings as errors) → `dotnet test`: one test per business rule and the architecture test → hygiene check; Phase-3 adds the UI's type check (ADR-005).
+No other tests: the QA live check proves every AC on real runs of the built programs, synthetic history replayed through the product's own importer where a scenario needs one; an AC tracing to a BR also cites the verify output.
+Named in `CLAUDE.md`, run by CI on every push and pull request. ≤ 2 review rounds per phase. ACs use window 12:00–13:30 and tiers over 5:30 → 0:15, over 7:00 → 0:30, over 9:00 → 1:00. Installed-build ACs run where unsigned executables run.
+Development runs through the signed `dotnet` host; Smart App Control is never turned off. On a company-managed laptop, Defender attack-surface-reduction rules can block an unsigned executable run from removable media, so hands-on checks there run a build made from source on that laptop.
 
 ### Cross-cutting concerns
 
@@ -268,7 +268,7 @@ company-managed laptop, Defender attack-surface-reduction rules can block an uns
 | 3–5, 13 | IaC, identity, auth, cutover | Out of scope — no cloud, no accounts, greenfield; the profile's access rights protect the file |
 | 6, 7, 12 | Health, observability, operations | Phase-2 — coverage spans, Run key, App and installer restart a stopped Recorder, gaps filled from history; errors-only log in the data folder, capped at 1 MB, never sent. Phase-3 shows status (FR-006) |
 | 8, 9 | Config, data, migrations | Phase-1 — lunch rules in the data file, no secrets; forward-only migrations at open (ADR-004) |
-| 10, 11 | Integration, tests | Windows notifications and event logs, read-only (ADR-003). Tests: domain scenarios; synthetic Windows event XML replayed through the import; store on a temp file; bridge contract both sides; scripted real-laptop protocols |
+| 10, 11 | Integration, tests | Windows notifications and event logs, read-only (ADR-003). Tests: one per business rule and the architecture test, in verify. Everything else is proven by the QA live check: built programs on a real laptop, scripted protocols, synthetic Windows event XML replayed through the product's own importer |
 | 14 | Network silence, power | Phase-2 probe, Phase-3 and Phase-4 24 h runs and forced crashes (NFR-001); Phase-2 power (NFR-003) |
 
 ### Human dependencies
@@ -340,7 +340,7 @@ company-managed laptop, Defender attack-surface-reduction rules can block an uns
 
 **Goal:** Week view, day timeline and lunch settings run in WebView2 on live and rebuilt data, with the recording status shown and the whole app proven silent, crashes included.\
 **Stop point:** The owner reads off a real week from the app they use every day.\
-**Rides along:** bridge contract tests, UI tests, prefilled settings (P1).\
+**Rides along:** the UI's type check in verify, prefilled settings (P1).\
 **Milestone:** M2 — on the target laptop the owner installs the local build and uses it for a working week: `.\wtt-setup.exe /VERYSILENT /CURRENTUSER`. Phase-4 waits until they have.\
 **Scope:** the screens — week, day timeline with ignored wakes and lunch explanation (A1), settings with tiers; the bridge (§5); recording status; web-view lockdown and local crash reports (ADR-006).\
 **Constraints:** the UI computes nothing; every number comes from the domain core over the bridge.\

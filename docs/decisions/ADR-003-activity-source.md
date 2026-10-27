@@ -51,8 +51,8 @@ read-only checks of Windows 11 laptops (2026-10-24):
 
 - A process runs from sign-in (visible under Startup apps); it must never keep the system awake.
 - Days rebuilt from history are less precise and are marked so (001 K1).
-- The Winlogon codes may change with a Windows update: fixture tests detect it; live recording is
-  unaffected.
+- The Winlogon codes may change with a Windows update: only a run against a real laptop's log shows
+  it; live recording is unaffected.
 - Raw activity times stay on the laptop until uninstall (001 K3; ADR-004).
 
 ## Sources

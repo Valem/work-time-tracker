@@ -18,8 +18,4 @@
     <ProjectReference Include="..\Wtt.Infrastructure\Wtt.Infrastructure.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="Wtt.Recorder.Tests" />
-  </ItemGroup>
-
 </Project>
