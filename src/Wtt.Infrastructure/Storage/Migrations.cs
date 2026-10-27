@@ -46,12 +46,8 @@ internal static class Migrations
         Execute(connection, null, "PRAGMA journal_mode = WAL;");
 
         using var transaction = connection.BeginTransaction(deferred: false);
-        var version = Convert.ToInt32(Scalar(connection, transaction, "PRAGMA user_version;"), CultureInfo.InvariantCulture);
-        if (version > Latest)
-        {
-            throw new InvalidOperationException(
-                $"The data file has schema version {version}, newer than this program knows ({Latest}). Use the newer program.");
-        }
+        var version = VersionOf(connection, transaction);
+        ThrowIfNewer(version);
 
         for (var step = version; step < Latest; step++)
         {
@@ -67,7 +63,20 @@ internal static class Migrations
         transaction.Commit();
     }
 
-    private static object? Scalar(SqliteConnection connection, SqliteTransaction transaction, string sql)
+    /// <summary>The schema version the file is at: 0 for a new, empty file.</summary>
+    public static int VersionOf(SqliteConnection connection, SqliteTransaction? transaction = null) =>
+        Convert.ToInt32(Scalar(connection, transaction, "PRAGMA user_version;"), CultureInfo.InvariantCulture);
+
+    public static void ThrowIfNewer(int version)
+    {
+        if (version > Latest)
+        {
+            throw new InvalidOperationException(
+                $"The data file has schema version {version}, newer than this program knows ({Latest}). Use the newer program.");
+        }
+    }
+
+    private static object? Scalar(SqliteConnection connection, SqliteTransaction? transaction, string sql)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;

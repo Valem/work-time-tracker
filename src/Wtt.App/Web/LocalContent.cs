@@ -8,9 +8,10 @@ internal static class LocalContent
 {
     public const string HostName = "app.wtt.example";
 
-    public static Uri StartPage { get; } = new($"https://{HostName}/index.html");
+    /// <summary>The start page, told which locale to show.</summary>
+    public static Uri StartPage(string locale) => new($"https://{HostName}/index.html?locale={Uri.EscapeDataString(locale)}");
 
-    /// <summary>Only the app's own pages may be navigated to; anything else is refused.</summary>
+    /// <summary>Only the app's own pages may be navigated to or send messages; anything else is refused.</summary>
     public static bool IsAppContent(string? uri) =>
         Uri.TryCreate(uri, UriKind.Absolute, out var parsed)
         && parsed.Scheme == Uri.UriSchemeHttps

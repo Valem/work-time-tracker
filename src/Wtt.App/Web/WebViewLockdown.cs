@@ -5,16 +5,19 @@ namespace Wtt.App.Web;
 
 /// <summary>
 /// The web view shows the app's own pages and nothing else: no outside navigation, new windows, downloads,
-/// permissions or external protocols; no single sign-on, reputation checks, autofill or crash uploads.
+/// permissions, external protocols or script dialogs; no single sign-on, reputation checks, autofill or crash uploads.
+/// Web messages are on for the bridge; the host answers only its own pages' messages.
 /// </summary>
 internal static class WebViewLockdown
 {
-    public static CoreWebView2EnvironmentOptions EnvironmentOptions() => new()
+    /// <param name="language">The language of anything the runtime itself shows, from the app's locale.</param>
+    public static CoreWebView2EnvironmentOptions EnvironmentOptions(string language) => new()
     {
         AllowSingleSignOnUsingOSPrimaryAccount = false,
         IsCustomCrashReportingEnabled = true,
         EnableTrackingPrevention = false,
         AreBrowserExtensionsEnabled = false,
+        Language = language,
     };
 
     public static void Apply(CoreWebView2 view, WebViewPolicy policy, ErrorLog log)
@@ -24,7 +27,8 @@ internal static class WebViewLockdown
         settings.AreBrowserAcceleratorKeysEnabled = policy.BrowserAcceleratorKeysEnabled;
         settings.AreDefaultContextMenusEnabled = policy.DefaultContextMenusEnabled;
         settings.AreHostObjectsAllowed = false;
-        settings.IsWebMessageEnabled = false;
+        settings.IsWebMessageEnabled = true;
+        settings.AreDefaultScriptDialogsEnabled = false;
         settings.IsStatusBarEnabled = false;
         settings.IsPasswordAutosaveEnabled = false;
         settings.IsGeneralAutofillEnabled = false;

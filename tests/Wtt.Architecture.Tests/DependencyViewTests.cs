@@ -8,7 +8,8 @@ namespace Wtt.Architecture.Tests;
 /// <summary>
 /// The dependency view of concept §3: Domain depends on nothing, Application on Domain, Infrastructure implements
 /// Application's ports, and the hosts — App, Recorder and the developer CLI — compose them without knowing each other
-/// (Recorder and App meet only in the database). Domain and Application reference neither Windows nor I/O.
+/// (Recorder and App meet only in the database). The build-time BridgeTypes reads the App's bridge contract and nothing
+/// else. Domain and Application reference neither Windows nor I/O.
 /// </summary>
 public sealed class DependencyViewTests
 {
@@ -22,6 +23,7 @@ public sealed class DependencyViewTests
         ["Wtt.App"] = HostReferences,
         ["Wtt.Recorder"] = HostReferences,
         ["Wtt.Cli"] = HostReferences,
+        ["Wtt.BridgeTypes"] = ["Wtt.App"],
     };
 
     /// <summary>
@@ -98,11 +100,15 @@ public sealed class DependencyViewTests
         {
             ["Wtt.Domain"] = ["Wtt.Infrastructure"],
             ["Wtt.Application"] = ["Wtt.Domain", "Wtt.App"],
-            ["Wtt.App"] = ["Wtt.Infrastructure", "Wtt.Recorder"],
+            ["Wtt.App"] = ["Wtt.Infrastructure", "Wtt.Recorder", "Wtt.BridgeTypes"],
+            ["Wtt.BridgeTypes"] = ["Wtt.App", "Wtt.Infrastructure"],
             ["Wtt.Unplaced"] = [],
         };
         Assert.Equal(
-            ["Wtt.Domain → Wtt.Infrastructure", "Wtt.Application → Wtt.App", "Wtt.App → Wtt.Recorder", "Wtt.Unplaced has no place in the dependency view"],
+            [
+                "Wtt.Domain → Wtt.Infrastructure", "Wtt.Application → Wtt.App", "Wtt.App → Wtt.Recorder", "Wtt.App → Wtt.BridgeTypes",
+                "Wtt.BridgeTypes → Wtt.Infrastructure", "Wtt.Unplaced has no place in the dependency view",
+            ],
             ReferenceViolations(crafted));
 
         string[] violating =

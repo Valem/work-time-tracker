@@ -8,6 +8,7 @@
     <AssemblyName>wtt</AssemblyName>
     <RootNamespace>Wtt.App</RootNamespace>
     <Product>Work Time Tracker</Product>
+    <NeutralLanguage>de</NeutralLanguage>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
@@ -24,8 +25,35 @@
     <PackageReference Include="Microsoft.Web.WebView2" />
   </ItemGroup>
 
+  <!--
+    The UI (src/ui, Preact + TypeScript) is bundled by Vite into src/ui/dist and ships as wwwroot beside the app, so
+    build, publish, tools/run.ps1 and the installer need no step of their own. npm ci runs when node_modules is
+    missing or older than the lockfile; the bundle is rebuilt when a UI source changes.
+  -->
+  <PropertyGroup>
+    <UiFolder>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\ui'))\</UiFolder>
+    <UiBundleFolder>$(UiFolder)dist\</UiBundleFolder>
+    <UiInstalledMarker>$(UiFolder)node_modules\.package-lock.json</UiInstalledMarker>
+  </PropertyGroup>
+
   <ItemGroup>
-    <Content Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <UiSource Include="$(UiFolder)src\**\*;$(UiFolder)index.html;$(UiFolder)vite.config.mjs;$(UiFolder)package-lock.json" />
   </ItemGroup>
+
+  <Target Name="RestoreUiPackages" Condition="'$(DesignTimeBuild)' != 'true'" Inputs="$(UiFolder)package-lock.json" Outputs="$(UiInstalledMarker)">
+    <Exec Command="npm ci" WorkingDirectory="$(UiFolder)" />
+    <Touch Files="$(UiInstalledMarker)" />
+  </Target>
+
+  <Target Name="BundleUi" Condition="'$(DesignTimeBuild)' != 'true'" DependsOnTargets="RestoreUiPackages" Inputs="@(UiSource);$(UiInstalledMarker)" Outputs="$(UiBundleFolder)index.html">
+    <Exec Command="npm run build" WorkingDirectory="$(UiFolder)" />
+  </Target>
+
+  <Target Name="IncludeUiBundle" Condition="'$(DesignTimeBuild)' != 'true'" DependsOnTargets="BundleUi" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <UiBundleFile Include="$(UiBundleFolder)**\*" />
+      <Content Include="@(UiBundleFile)" Link="wwwroot\%(UiBundleFile.RecursiveDir)%(UiBundleFile.Filename)%(UiBundleFile.Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 
 </Project>

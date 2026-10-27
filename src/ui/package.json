@@ -1,0 +1,19 @@
+{
+  "name": "wtt-ui",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "vite build --logLevel warn",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vite": "7.3.7"
+  }
+}

@@ -16,6 +16,11 @@ TestResults/
 *.user
 .vs/
 
+# UI: packages, the Vite bundle, and the bridge declarations Wtt.BridgeTypes writes from C# at every build
+src/ui/node_modules/
+src/ui/dist/
+src/ui/src/bridge/contract.ts
+
 # Real usage data never enters the repository (ADR-005): event-log exports and data files
 *.evtx
 *.db

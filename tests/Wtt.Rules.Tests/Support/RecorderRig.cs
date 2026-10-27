@@ -86,10 +86,8 @@ internal sealed class RecorderRig : IDisposable
         recorder = new LiveRecorder(
             Journal,
             Coverage,
-            new HistoryImport(history, Journal, new SqliteHistoryCursorStore(database)),
-            Users.Me,
+            new HistoryCatchUp(new HistoryImport(history, Journal, new SqliteHistoryCursorStore(database)), Users.Me, new ThrowingErrorLog()),
             Desktop,
-            new ThrowingErrorLog(),
             Clock);
         await recorder.StartAsync();
         await recorder.CatchUpAsync();

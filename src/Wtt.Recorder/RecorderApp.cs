@@ -23,6 +23,9 @@ internal static class RecorderApp
 
     private static readonly TimeSpan StopWait = TimeSpan.FromSeconds(10);
 
+    /// <summary>An import still running at the end is left unfinished: its facts commit whole or not at all, and the next start reads again.</summary>
+    private static readonly TimeSpan ImportStopWait = TimeSpan.FromSeconds(1);
+
     public static int Run(string[] args)
     {
         if (!RecorderOptions.TryParse(args, out var options))
@@ -60,11 +63,12 @@ internal static class RecorderApp
     {
         var clock = TimeProvider.System;
         var desktop = new WindowsDesktop(clock);
-        var recorder = Compose(options, errors, desktop, clock);
+        var imports = new RecorderWorker(errors);
+        var recorder = Compose(options, errors, desktop, clock, imports);
         recorder.StartAsync().GetAwaiter().GetResult();
+        recorder.CatchUpAsync().GetAwaiter().GetResult();
 
         var worker = new RecorderWorker(errors);
-        worker.Post("Importing Windows history", recorder.CatchUpAsync);
 
         SignalWindow? window = null;
         window = new SignalWindow(
@@ -94,6 +98,7 @@ internal static class RecorderApp
         window.Run();
         worker.Post("Closing", recorder.HeartbeatAsync);
         worker.Stop(StopWait);
+        imports.Stop(ImportStopWait);
     }
 
     /// <summary>
@@ -119,13 +124,14 @@ internal static class RecorderApp
         }
     }
 
-    private static LiveRecorder Compose(RecorderOptions options, IErrorLog errors, IDesktop desktop, TimeProvider clock)
+    private static LiveRecorder Compose(RecorderOptions options, IErrorLog errors, IDesktop desktop, TimeProvider clock, RecorderWorker imports)
     {
         var database = SqliteDatabase.Open(options.Data.DataFile, clock);
         var journal = new SqliteFactJournal(database);
         var user = new UserSid(WindowsIdentity.GetCurrent().User?.Value ?? throw new InvalidOperationException("No Windows user."));
         var history = new HistoryImport(new HistoryInCurrentZone(), journal, new SqliteHistoryCursorStore(database));
-        return new LiveRecorder(journal, new SqliteCoverageLog(database, clock), history, user, desktop, errors, clock);
+        var catchUp = new QueuedCatchUp(new HistoryCatchUp(history, user, errors), imports);
+        return new LiveRecorder(journal, new SqliteCoverageLog(database, clock), catchUp, desktop, clock);
     }
 
     /// <summary>The Recorder runs for days: each read takes the time zone in force then, not the one at start.</summary>

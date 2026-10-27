@@ -1,10 +1,13 @@
 #Requires -Version 7
 # The project's one verify command, run locally and by CI:  pwsh tools/verify.ps1
-# Exits non-zero on the first failing step.
+# .NET build (warnings as errors; the App's build also restores and bundles src/ui, and Wtt.BridgeTypes writes the
+# bridge declarations from C#) -> .NET tests -> the UI type check against those declarations -> hygiene.
+# Needs the .NET SDK and Node.js (the version in src/ui/.nvmrc). Exits non-zero on the first failing step.
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $solution = Join-Path $root 'WorkTimeTracker.slnx'
+$ui = Join-Path $root 'src/ui'
 
 function Invoke-Step {
     param([string] $Name, [scriptblock] $Command)
@@ -19,10 +22,7 @@ function Invoke-Step {
 Invoke-Step '.NET build (warnings as errors)' { dotnet build $solution --configuration Release -warnaserror --nologo }
 Invoke-Step '.NET tests' { dotnet test $solution --configuration Release --no-build --nologo }
 
-# ==== UI checks hook (Phase-3) ==========================================================
-# Phase-3 adds the UI's type check here, as a further Invoke-Step line
-# (src/ui, Node LTS). Nothing else in this script or in CI needs to change for it.
-# ========================================================================================
+Invoke-Step 'UI type check' { node (Join-Path $ui 'node_modules/typescript/bin/tsc') --noEmit --project $ui }
 
 Invoke-Step 'Hygiene (public repository)' { & (Join-Path $PSScriptRoot 'check-hygiene.ps1') }
 

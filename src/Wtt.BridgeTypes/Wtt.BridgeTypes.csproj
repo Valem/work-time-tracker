@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Build-time only, never installed: after the App compiles, writes the bridge's TypeScript declarations into
+    src/ui from the App's contract records, refusal codes and serializer options.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Wtt.BridgeTypes</RootNamespace>
+    <IsPublishable>false</IsPublishable>
+    <DeclarationsFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\ui\src\bridge\contract.ts'))</DeclarationsFile>
+    <DotnetHost>$(DOTNET_HOST_PATH)</DotnetHost>
+    <DotnetHost Condition="'$(DotnetHost)' == ''">dotnet</DotnetHost>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Wtt.App\Wtt.App.csproj" />
+  </ItemGroup>
+
+  <Target Name="WriteBridgeDeclarations" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="&quot;$(DotnetHost)&quot; &quot;$(TargetPath)&quot; &quot;$(DeclarationsFile)&quot;" />
+  </Target>
+
+</Project>

@@ -1,5 +1,4 @@
 using System.Globalization;
-using Wtt.Application.History;
 using Wtt.Application.Ports;
 using Wtt.Domain.Facts;
 
@@ -12,10 +11,8 @@ namespace Wtt.Application.Recording;
 public sealed class LiveRecorder(
     IFactJournal journal,
     ICoverageLog coverage,
-    HistoryImport history,
-    UserSid user,
+    IHistoryCatchUp history,
     IDesktop desktop,
-    IErrorLog errors,
     TimeProvider clock)
 {
     public static readonly TimeSpan HeartbeatInterval = TimeSpan.FromMinutes(1);
@@ -78,7 +75,7 @@ public sealed class LiveRecorder(
     }
 
     /// <summary>Imports what Windows kept since the cursor: the days before the first start and any gap since.</summary>
-    public Task CatchUpAsync() => ImportHistoryAsync();
+    public Task CatchUpAsync() => history.CatchUpAsync();
 
     public async Task HeartbeatAsync()
     {
@@ -99,7 +96,7 @@ public sealed class LiveRecorder(
         await RecordIdleLockIfChangedAsync(now);
         if (gap)
         {
-            await ImportHistoryAsync();
+            await history.CatchUpAsync();
         }
     }
 
@@ -196,7 +193,7 @@ public sealed class LiveRecorder(
 
         if (gap)
         {
-            await ImportHistoryAsync();
+            await history.CatchUpAsync();
         }
     }
 
@@ -243,18 +240,6 @@ public sealed class LiveRecorder(
         {
             idleLockWritten = inForce;
             await journal.AppendAsync([IdleTimeoutFact(now, inForce)]);
-        }
-    }
-
-    private async Task ImportHistoryAsync()
-    {
-        try
-        {
-            await history.ImportAsync(user);
-        }
-        catch (Exception failure)
-        {
-            errors.Write("Importing Windows history", failure);
         }
     }
 

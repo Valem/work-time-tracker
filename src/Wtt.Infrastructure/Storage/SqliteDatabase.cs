@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Data.Sqlite;
 using Wtt.Domain.Time;
 
@@ -27,24 +28,64 @@ public sealed class SqliteDatabase
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-            var connectionString = new SqliteConnectionStringBuilder
-            {
-                DataSource = fullPath,
-                Mode = SqliteOpenMode.ReadWriteCreate,
-                Pooling = false,
-                DefaultTimeout = Math.Max(1, (int)(busyTimeout ?? TimeSpan.FromSeconds(30)).TotalSeconds),
-            }.ToString();
-
-            var database = new SqliteDatabase(connectionString);
+            var database = new SqliteDatabase(ConnectionString(fullPath, SqliteOpenMode.ReadWriteCreate, busyTimeout));
             using var connection = database.Connect();
             Migrations.Apply(connection, clock.GetLocalNow().LocalDate());
             return database;
         }
-        catch (Exception exception) when (exception is SqliteException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (IsDataFileFailure(exception))
         {
             throw new DataFileException(fullPath, exception);
         }
     }
+
+    /// <summary>
+    /// Opens the file only when it exists at this program's schema version, and never creates or migrates it: a
+    /// program that reads beside a running Recorder leaves the schema to that Recorder.
+    /// </summary>
+    /// <returns>False when the file does not exist yet or is at an older schema version.</returns>
+    /// <exception cref="DataFileException">The file is locked, damaged, unreachable or newer than this program.</exception>
+    public static bool TryOpenCurrent(string path, TimeSpan busyTimeout, [NotNullWhen(true)] out SqliteDatabase? database)
+    {
+        database = null;
+        var fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var opened = new SqliteDatabase(ConnectionString(fullPath, SqliteOpenMode.ReadWrite, busyTimeout));
+            using var connection = opened.Connect();
+            var version = Migrations.VersionOf(connection);
+            Migrations.ThrowIfNewer(version);
+            if (version < Migrations.Latest)
+            {
+                return false;
+            }
+
+            database = opened;
+            return true;
+        }
+        catch (Exception exception) when (IsDataFileFailure(exception))
+        {
+            throw new DataFileException(fullPath, exception);
+        }
+    }
+
+    /// <summary>What opening the file can fail with: SQLite, a newer schema, the file system, access rights.</summary>
+    private static bool IsDataFileFailure(Exception exception) =>
+        exception is SqliteException or InvalidOperationException or IOException or UnauthorizedAccessException;
+
+    private static string ConnectionString(string fullPath, SqliteOpenMode mode, TimeSpan? busyTimeout) =>
+        new SqliteConnectionStringBuilder
+        {
+            DataSource = fullPath,
+            Mode = mode,
+            Pooling = false,
+            DefaultTimeout = Math.Max(1, (int)(busyTimeout ?? TimeSpan.FromSeconds(30)).TotalSeconds),
+        }.ToString();
 
     internal SqliteConnection Connect()
     {
