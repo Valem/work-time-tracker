@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.5.0 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
+**Version:** v1.5.1 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
 
 ## 1. Executive Context
 
@@ -325,10 +325,10 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 | AC-2.1 | Over 5 scripted workdays, recorded start = first unlock ± 60 s and end = last real input ± 60 s against a hand log, one end by idle auto-lock; a 45-minute lock at lunch is a 45 ± 1 minute pause | FR-001, BR-003 |
 | AC-2.2 | A video holds the display on for 30 min without input, then the idle lock comes → use ends at lock time − idle timeout ± 60 s; the lid closed after 30 min of video without input → use ends at lid time ± 60 s | FR-001, BR-003 |
 | AC-2.3 | After a cold boot the day is not marked rebuilt, its start = sign-in ± 60 s and its coverage begins at sign-in, the stretch until the Recorder started filled from history; a day with a standby at lunch is not marked rebuilt; after restart, sign-out/in and overnight standby, coverage resumes from sign-in without any action | FR-001, UC-002, BR-004, BR-011 |
-| AC-2.4 | With "require sign-in after sleep: never": standby at lunch, then input → use restarts at the first input ± 60 s; overnight Windows wakes add no use; `powercfg /requests` never lists the Recorder; its CPU averages < 0.5 % over 8 h | FR-001, BR-001, BR-002 |
+| AC-2.4 | With "require sign-in after sleep: never": standby at lunch, then input → use restarts at the first input ± 60 s; overnight Windows wakes add no use; `powercfg /requests` never lists the Recorder; its CPU averages < 0.5 % over 4 h awake | FR-001, BR-001, BR-002 |
 | AC-2.5 | Recorder stopped for 30 minutes with a lock and an unlock inside → on its next start the gap is filled from history and that day is marked rebuilt; a stop during continuous use leaves the day as recorded | FR-002, BR-004 |
 | AC-2.6 | `winget validate` passes; `Tools/SandboxTest.ps1` installs the manifest in Windows Sandbox; a Defender scan of the installed folder finds nothing; `wtt-setup.exe /VERYSILENT /CURRENTUSER` installs without admin rights or a UAC prompt; upgrading in place keeps the facts; uninstalling removes the program, the `Run` value and the data folder (K3) | FR-001, UC-002 |
-| AC-2.7 | WebView2 open on the placeholder for 8 h → no outbound connection from the app's process tree but the runtime's own update and time checks (NFR-001 probe); a second standard user account is denied opening the data file (NFR-002) | FR-001, UC-002 |
+| AC-2.7 | WebView2 open on the placeholder for 4 h awake → no outbound connection from the app's process tree but the runtime's own update and time checks (NFR-001 probe); a second standard user account is denied opening the data file (NFR-002) | FR-001, UC-002 |
 | AC-2.8 | Unlock 08:00, lock 12:00–13:00, lock 17:30, unlock 22:40, shutdown 22:42 → start 08:00, end 17:30, break 1:00, total 8:32; the same visit at 19:30–19:32 (last pause 2:00) → end 17:30, total 8:32; at 19:29–19:31 (last pause 1:59) → end 19:31, total 10:31 | FR-003, BR-005, BR-012 |
 | AC-2.9 | Unlock 08:00, lock 12:15–15:00, lock 17:00 → the last pause touches the lunch window and is the lunch pause: end 17:00, break 2:45, total 6:15 | FR-003, BR-007, BR-012 |
 | AC-2.10 | Unlock 08:00, lock 15:00 → break 0:15, total 6:45; with a visit 20:00–20:20 added → end 15:00, break 0:20, total 7:00 (the evening minutes count toward the tier) | FR-003, BR-008, BR-012 |
