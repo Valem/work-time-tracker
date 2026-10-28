@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.5.5 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.1 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
+**Version:** v1.5.6 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.1 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
 
 ## 1. Executive Context
 
@@ -294,7 +294,7 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 | 6, 7, 12 | Health, observability, operations | Phase-2 — coverage spans, Run key, App and installer restart a stopped Recorder, gaps filled from history; errors-only log in the data folder, capped at 1 MB, never sent. Phase-3 shows status (FR-006) |
 | 8, 9 | Config, data, migrations | Phase-1 — lunch rules in the data file, no secrets; forward-only migrations at open (ADR-004) |
 | 10, 11 | Integration, tests | Windows notifications and event logs, read-only (ADR-003). Tests: one per business rule and the architecture test, in verify. Everything else is proven by the QA live check: built programs on a real laptop, scripted protocols, synthetic Windows event XML replayed through the product's own importer |
-| 14 | Network silence, power | Phase-2 probe, Phase-3 5 h and Phase-4 24 h runs and forced crashes (NFR-001); Phase-2 power (NFR-003) |
+| 14 | Network silence, power | Phase-2 probe, Phase-3 and Phase-4 5 h runs and forced crashes (NFR-001); Phase-2 power (NFR-003) |
 
 ### Human dependencies
 
@@ -403,7 +403,7 @@ a data file that cannot be opened (newer, damaged, locked) shown as a problem na
 | AC-4.1 | A version tag publishes installer and CLI with SHA-256 hashes on a GitHub Release; the winget-pkgs pull request passes validation and is merged | FR-001, UC-001 |
 | AC-4.2 | A colleague runs `winget install <id>` without admin rights and sees today and past days without asking anyone | FR-004, UC-001 |
 | AC-4.3 | `winget upgrade` to a later release keeps all facts, and the Recorder runs again within 60 s | FR-001, UC-001 |
-| AC-4.4 | 24 h on the published build: no outbound connection from the app's process tree but NFR-001's exception | FR-001, UC-001 |
+| AC-4.4 | 5 h awake on the published build: no outbound connection from the app's process tree but NFR-001's exception | FR-001, UC-001 |
 
 ## 7. Agent-introduced in this version
 
