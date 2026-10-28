@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.5.8 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.1 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
+**Version:** v1.6.0 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.1 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
 
 ## 1. Executive Context
 
@@ -90,6 +90,7 @@ classDiagram
     <<derived>>
     List~UseSpan~ uses
     List~Pause~ pauses
+    List~DateTimeOffset~ windowsWakes
   }
   class LunchRule {
     <<applies from a date>>
@@ -101,12 +102,16 @@ classDiagram
     <<derived, never stored>>
     DateOnly date
     List~WorkBlock~ blocks
+    List~Pause~ pauses
     Pause nightPause
     LunchDeduction lunch
     Pause eveningPause
     Duration eveningUse
+    Duration attendance
     Duration total
     Precision precision
+    List~DateTimeOffset~ windowsWakes
+    workSpans() List~WorkBlock~
   }
   ActivityFact "*" --> "1" PresenceTimeline : built into
   CoverageSpan "*" --> "1" PresenceTimeline : live wins inside
@@ -118,7 +123,10 @@ classDiagram
 Value types: `at` = the instant with the UTC offset in force · `FactKind` = Unlock, Lock, SignIn, SignOut, StandbyEnter, StandbyExit, Boot, Shutdown,
 LastInput, IdleTimeout · `FactSource` = Live, WinlogonHistory, SystemHistory · `FactDetail` (end cause, timer, reason name, raw reason as Windows gave it,
 session), stored as JSON · `CoverageSpan` (from, to) · `WorkWeek` (monday, days, total) · `UseSpan` (start, end, precision) · `Pause`
-(start, end, ignored wakes) · `BreakTier` (over, minimum) · `LunchDeduction` (pause, deducted, basis).\
+(start, end, the ignored wakes inside it) · `WorkBlock` (start, end) · `BreakTier` (over, minimum) · `LunchDeduction` (pause, deducted, basis).\
+**Workday:** `blocks` run from start to end, split only at the night pause; `pauses` are every pause between its uses; `windowsWakes` are the wakes Windows did
+alone (BR-002) on its local date, inside a pause or not. `workSpans` are the blocks minus the pauses drawn over them — the day bar's plain work segments, never the
+work time: a pause counted as work (BR-005) and the evening use (BR-012) are work yet lie in no work span; `total` (attendance − break) is the work time.\
 **Invariants:** the fact journal is append-only and deduplicated by `sourceKey`; only the Recorder writes live facts; stored facts are never rewritten.
 Infrastructure names a reason from its stored raw reason with the current mapping when facts are read (ADR-004), so a reason named later (fingerprint)
 reaches facts already stored; domain rules decide on reason names only, and the raw reason passes through the domain unread; a name or cause it does not know reads as unknown, never as an error. Lunch rules are superseded, never edited. Workdays
@@ -160,13 +168,13 @@ flowchart TB
 ```text
 src/
 ├── Wtt.Domain/          # facts, presence, workday rules — no Windows, no I/O
-├── Wtt.Application/     # queries, commands, ports (journal, coverage, history, cursor, rules)
-├── Wtt.Infrastructure/  # SQLite store, event-log history reader, live session/power/input signals
-├── Wtt.Recorder/        # headless per-user process (Run key)
-├── Wtt.App/             # Windows Forms host, WebView2, bridge
-├── Wtt.Cli/             # self-contained CLI printing weeks, own data file; not installed
+├── Wtt.Application/     # queries, live recording, history import and catch-up, reports; ports (journal, coverage, history, cursor, rules, desktop, error log)
+├── Wtt.Infrastructure/  # SQLite store, event-log history reader, live session/power/input signals, error log
+├── Wtt.Recorder/        # headless per-user process (Run key); one worker for signals and heartbeat, one for history imports
+├── Wtt.App/             # Windows Forms host, WebView2, bridge (Bridge/: contract records, refusal codes, handlers)
+├── Wtt.Cli/             # wtt-cli: weeks, start-test, import-xml; own data file; self-contained, not installed
 ├── Wtt.BridgeTypes/     # build-time: writes the bridge's TypeScript declarations into ui/; not installed
-└── ui/                  # Preact + TypeScript (Vite)
+└── ui/                  # Preact + TypeScript (Vite): screens, locales, bridge client; probes/ for the type check
 installer/               # Inno Setup script, winget manifest template
 tests/                   # Wtt.Rules.Tests: one test per business rule · Wtt.Architecture.Tests: the dependency view
 tools/                   # verify.ps1, check-hygiene.ps1, wtt-check.ps1, run.ps1
@@ -188,9 +196,9 @@ sequenceDiagram
   R->>W: session logon time; Winlogon 811 and System events since cursor
   W-->>R: ~7 weeks lock/unlock, ~3 months power events
   R->>D: facts of this user's sessions (deduplicated), cursor, coverage from sign-in
-  A->>D: read facts, coverage, rule in force (prefilled)
+  A->>D: once the Recorder has created or migrated the file: read facts, coverage, rule in force (prefilled)
   A-->>P: today and past weeks, rebuilt days marked
-  Note over R,D: after any gap (crash, upgrade, Run entry off) the next start imports since cursor; filled spans are marked rebuilt
+  Note over R,D: imports run on the Recorder's import worker, never delaying its heartbeat; after any gap (crash, upgrade, Run entry off) the next start or heartbeat imports since cursor; filled spans are marked rebuilt
 ```
 
 ### UC-002 — recording a day, Windows' own wakes ignored
@@ -226,7 +234,7 @@ sequenceDiagram
   Q-->>U: days with start, end, break, total, rebuilt mark, week total
   P->>U: save lunch window and tiers
   U->>Q: lunchRule.save via the host (first save: back to the oldest fact)
-  Q-->>U: affected days recomputed (BR-009)
+  Q-->>U: saved rule and the date it applies from; every later read derives the days anew (BR-009)
 ```
 
 ## 5. Interfaces & Contracts
@@ -234,34 +242,35 @@ sequenceDiagram
 ### Bridge messages (UI ↔ App host, ADR-006)
 
 ```text
-week.get        { monday? }        → ISO week number, previous and next Monday (null at the oldest kept fact's week and at the current week),
+week.get        { monday? }        → ISO week (year, number), previous and next Monday (null at the oldest kept fact's week and at the current week),
                                      7 days (date, start, end, break, total, rebuilt) + week total; no monday: the current week
-day.get         { date }           → its week's Monday, start, end, blocks, pauses with ignored wakes, night pause,
-                                     lunch pause + deducted + basis, evening pause + evening use, total, rebuilt
+day.get         { date }           → the date, its week's Monday, start, end, work spans, pauses each with its role (work, lunch, night, evening),
+                                     Windows' own wakes on that date, night pause, lunch pause + deducted + basis, evening pause + evening use, break, total, rebuilt
 status.get      { }                → recording (this session's Recorder holds its mutex and coverage reached within 2 min),
                                      last recorded as date and minutes at the laptop's current offset
 lunchRule.get   { }                → rule in force today (window, tiers), the date it applies from, prefilled or saved
 lunchRule.save  { window, tiers }  → saved rule and the date it applies from, or a refusal (nothing saved)
-any request     { id, type, payload } → { id, result } or { id, error: { code } }; the UI asks, the host never pushes
+any request     { id, type, payload } → { id, result } or { id, error: { code } } (id null when unreadable); the UI asks, the host never pushes
 ```
 
-- **Contract:** the C# message records and the closed set of refusal codes in `Wtt.App` are the contract, serialized with one shared
-  `JsonSerializerOptions` (Web defaults: camelCase, enums as strings). After the App compiles, `Wtt.BridgeTypes` reads those records,
-  codes and options and writes their TypeScript declarations into `src/ui` (ADR-006); the UI type check compiles against them, so a
-  field or code renamed, removed or retyped in C# fails verify.
-- **Values:** dates cross as `yyyy-MM-dd` with their ISO weekday, times as minutes from that day's midnight at the offset stored with
-  each fact (1440 = 24:00), durations as whole minutes. The host supplies navigation and calendars — previous and next, weekdays,
-  week numbers, the current offset — so the UI never steps a date or reads a clock; it only places and formats values.
-- **Text and formats (NFR-005):** one place in the host decides the active locale — de-CH, the only one in 001 — sets the host's UI
-  culture from it and passes its name in the start page's address. The UI looks that name up in a registry of locales, each a
-  language's texts (every screen text and one per refusal code) joined with a region's formats (date, weekday, week, time, duration),
-  typed so that a locale lacking any of them fails the type check. Screens take every text and format from it, never from `Intl` or
-  a JS `Date`. The host's own messages (no WebView2 runtime, a data file it cannot open, a crashed page) come from its resources.
-- **Refusals:** the host handles messages only from its own page's origin (the `WebMessageReceived` source) and of these five types,
-  off the window's thread. It refuses, with one code and nothing saved, a malformed or unknown message, a date outside 2000–2099, a
-  `monday` that is no Monday, a window not ending after it starts, more than 10 tiers, a value negative, over 24 h or not whole
-  minutes, two tiers on one threshold, and a data file it cannot read; each refusal is logged.
-- **Refresh:** every 30 s and whenever the window is shown again, the UI re-requests the status and the week or day it shows.
+- **Contract:** the C# message records — each message type registered once with its request record, its result record and its handler, a result
+  always written as that record — and the closed set of refusal codes in `Wtt.App` are the contract, serialized with one shared `JsonSerializerOptions`
+  (Web defaults: camelCase, enums as camelCase strings, strict reading). After the App compiles, `Wtt.BridgeTypes` reads those records, codes and options
+  and writes their TypeScript declarations into `src/ui` (ADR-006); the UI type check compiles against them, so a field or code renamed, removed or retyped in C# fails verify.
+- **Values:** dates cross as `yyyy-MM-dd` with their ISO weekday, times as minutes from that day's midnight at the offset stored with each fact (1440 = 24:00),
+  durations as whole minutes. The host supplies navigation and calendars — previous and next, weekdays, week numbers, the current offset — so the UI never
+  steps a date or reads a clock; it only places and formats values. A day's work spans are `Workday.WorkSpans`: the bar's plain work segments, never summed as work time (§3).
+- **Text and formats (NFR-005):** one place in the host decides the active locale — de-CH, the only one in 001 — sets the host's UI culture from it and passes
+  its name in the start page's address. The UI looks that name up in a registry of locales, each a language's texts (every screen text, the weekday names, one
+  per refusal code) joined with a region's formats (date, week, time, duration, and reading a typed time or duration back into minutes), typed so that a locale
+  lacking any of them fails the type check (`src/ui/probes`). Screens take every text and format from it, never from `Intl` or a JS `Date`. The host's own
+  messages (no WebView2 runtime, pages it cannot show, a data file it cannot open or read, a crashed page) come from its resources.
+- **Refusals:** the host answers only its own page's origin (the `WebMessageReceived` source; anything else is logged, unanswered) and these five types, off the
+  window's thread. It refuses with one code, nothing saved: `malformed` (not JSON; a field missing, extra, null or mistyped), `unknownType`, `dateOutOfRange`
+  (outside 2000–2099), `notMonday`, `windowNotAfterStart`, `tooManyTiers` (over 10), `valueOutOfRange` (negative, over 24 h, a lunch-window time over 23:59),
+  `notWholeMinutes`, `duplicateThreshold`, `invalidRule` (the domain refuses the rule otherwise), `dataFileUnreadable` and `failed` (any other failure). Each
+  refusal is logged with its details; after `dataFileUnreadable`, at any point of the session, the window replaces the page with D1's message.
+- **Refresh:** every 30 s while the window is visible, and whenever it is shown again or gets the focus back, the UI re-requests the status and the week or day it shows.
 
 ### Service Interfaces
 
@@ -270,6 +279,10 @@ public interface IFactJournal { Task<int> AppendAsync(IReadOnlyList<ActivityFact
 public interface ICoverageLog { Task<DateTimeOffset> BeginAsync(DateTimeOffset signedInAt); Task ExtendAsync(DateTimeOffset now); Task ResumeAsync(DateTimeOffset suspendedAt, DateTimeOffset resumedAt); Task<IReadOnlyList<CoverageSpan>> ReadAsync(Interval range); }   // Begin returns the coverage start: the sign-in after an autostart within 5 min, else now; Resume bridges a standby whose start and end the Recorder saw
 public interface IHistorySource { Task<HistoryBatch> ReadSinceAsync(HistoryCursor cursor, UserSid user); }   // facts + next cursor (time, session open then)
 public interface IHistoryCursorStore { Task<HistoryCursor> LoadAsync(); Task SaveAsync(HistoryCursor cursor); }
+public interface IHistoryCatchUp { Task CatchUpAsync(); }   // imports since the cursor, a failure logged; the Recorder wraps it in QueuedCatchUp: imports on a worker of their own, at most one waiting, so no heartbeat or signal waits behind one
+public interface IDesktop { SignInSession CurrentSession(); DateTimeOffset LastInput(); IdleTimers TimersInForce(); }   // the Recorder's own session: sign-in time and lock state, last real input, the idle timers in force
+public interface IErrorLog { void Write(string context, Exception error); }   // errors only, in the data folder, capped at 1 MB, never sent
+public sealed class LiveRecorder(IFactJournal journal, ICoverageLog coverage, IHistoryCatchUp history, IDesktop desktop, TimeProvider clock)   // signals → live facts and coverage, one call at a time; a start, or a heartbeat or resume after a gap, asks for a catch-up
 public interface ILunchRules { Task<LunchRule> InForceOnAsync(DateOnly date); Task<LunchRule> SaveAsync(TimeRange window, IReadOnlyList<BreakTier> tiers); }
 public interface IPresenceBuilder { PresenceTimeline Build(Interval range, IReadOnlyList<ActivityFact> facts, IReadOnlyList<CoverageSpan> coverage, DateTimeOffset? winlogonHistoryFrom); }
 public interface IWorkdayCalculator { Workday Calculate(DateOnly date, PresenceTimeline presence, LunchRule rule); }
@@ -281,7 +294,7 @@ public interface IWorkTimeQueries { Task<WorkWeek> GetWeekAsync(DateOnly monday)
 **Verify command:** `pwsh tools/verify.ps1` — .NET build (warnings as errors) → `dotnet test`: one test per business rule and the architecture test → the UI type check (`tsc --noEmit` in `src/ui`) → hygiene check (ADR-005).
 From Phase-3 the App's build also runs `npm ci` when `node_modules` is missing or older than the lockfile and bundles `src/ui` with Vite into its output, so `dotnet publish`, `tools/run.ps1` and the installer need no step of their own; the solution's build runs `Wtt.BridgeTypes` after the App compiles (§5).
 No other tests: the QA live check proves every AC on real runs of the built programs, synthetic history replayed through the product's own importer where a scenario needs one; an AC tracing to a BR also cites the verify output.
-The App opens such a file with `wtt --data <folder>` (file `wtt.db`); as the Recorder it starts there imports that laptop's history, the fixture's dates lie before the laptop's oldest kept event.
+The App opens such a file with `wtt --data <folder>` (file `wtt.db`); started from its build folder it finds no Recorder beside it and starts none, so the file holds only the imported facts.
 Named in `CLAUDE.md`, run by CI on every push and pull request. ≤ 2 review rounds per phase. ACs use window 12:00–13:30 and tiers over 5:30 → 0:15, over 7:00 → 0:30, over 9:00 → 1:00. Installed-build ACs run where unsigned executables run.
 Development runs through the signed `dotnet` host; Smart App Control is never turned off. On a company-managed laptop, Defender attack-surface-reduction rules can block an unsigned executable run from removable media, so hands-on checks there run a build made from source on that laptop.
 
@@ -291,8 +304,8 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 |---|---------|--------|
 | 1, 2 | Repository, CI/CD | Phase-1 — §3 structure, .NET 10, package source pinned to nuget.org; verify on every push and PR. Phase-3 — Node 24 LTS pinned in `src/ui/.nvmrc` (CI's setup-node reads it), registry pinned to registry.npmjs.org in `src/ui/.npmrc`, lockfile committed, `npm ci`. Phase-4 — release on tag (ADR-005) |
 | 3–5, 13 | IaC, identity, auth, cutover | Out of scope — no cloud, no accounts, greenfield; the profile's access rights protect the file |
-| 6, 7, 12 | Health, observability, operations | Phase-2 — coverage spans, Run key, App and installer restart a stopped Recorder, gaps filled from history; errors-only log in the data folder, capped at 1 MB, never sent. Phase-3 shows status (FR-006) |
-| 8, 9 | Config, data, migrations | Phase-1 — lunch rules in the data file, no secrets; forward-only migrations at open (ADR-004) |
+| 6, 7, 12 | Health, observability, operations | Phase-2 — coverage spans, Run key, App and installer restart a stopped Recorder, gaps filled from history; errors-only log in the data folder, capped at 1 MB, never sent. Phase-3 — history imports on a worker of their own, so the heartbeat never waits behind one; status shown (FR-006); a data file the App cannot open or read, at start or mid-session, replaces the page with D1's message |
+| 8, 9 | Config, data, migrations | Phase-1 — lunch rules in the data file, no secrets; forward-only migrations at open (ADR-004). Phase-3 — the Recorder migrates at its start; the App migrates only when no Recorder runs, else waits up to 30 s for that Recorder to bring the file to the App's version and otherwise shows D1's message, so an older Recorder never runs on a schema it does not know |
 | 10, 11 | Integration, tests | Windows notifications and event logs, read-only (ADR-003). Tests: one per business rule and the architecture test, in verify. Everything else is proven by the QA live check: built programs on a real laptop, scripted protocols, synthetic Windows event XML replayed through the product's own importer |
 | 14 | Network silence, power | Phase-2 probe, Phase-3 and Phase-4 5 h runs, a forced renderer crash and the WER exclusions (NFR-001); Phase-2 power (NFR-003) |
 
@@ -369,10 +382,10 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 **Milestone:** M2 — on the target laptop the owner builds and installs the local build and uses it for a working week: `pwsh tools/run.ps1 -Installer`, then `.\artifacts\installer\wtt-setup.exe /VERYSILENT /CURRENTUSER`. Phase-4 waits until they have.\
 **Scope:** one window in German with Swiss formats, every text and format from the de-CH locale (NFR-005), the recording status always in view (whether it records and when it last recorded, or since when it has stopped);\
 week — Monday–Sunday rows with start, end (24:00 past midnight), break, total and rebuilt mark, the week total, previous and next week as the host supplies them from the oldest kept fact's week to the current one, opening on the current week;\
-day, opened from its row — a 00:00–24:00 timeline of work blocks and pauses with the ignored Windows wakes, the night pause, the lunch pause with what was deducted and whether the tier raised it (A1), the evening pause and the minutes after it (E2); its legend lists the kinds that occur that day, each with the start and end of each of its spans (L1), and the explanation of the day stays closed until the person opens it;\
+day, opened from its row — a 00:00–24:00 timeline of work and pauses with the Windows wakes ignored on that date, the night pause, the lunch pause with what was deducted and whether the tier raised it (A1), the evening pause and the minutes after it (E2); its legend lists the kinds that occur that day, each with the start and end of each of its spans (L1), and the explanation of the day stays closed until the person opens it;\
 settings — lunch window and tiers (add, remove), prefilled until the first save (P1), a save showing the date it applies from (K4), an invalid entry refused with its reason (V1);\
 the bridge (§5); web-view lockdown and local crash reports (ADR-006), web messages enabled for the app's own origin only, a crashed renderer replaced by a message asking to restart the app (R1);\
-a data file that cannot be opened (newer, damaged, locked) shown as a problem naming the error log's path (D1).\
+a data file that cannot be opened (newer, damaged, locked) or fails while the app runs, shown in place of the page as a problem naming the error log's path (D1).\
 **Constraints:** the UI computes nothing; every number comes from the domain core over the bridge, every time already at the fact's stored offset (§5); no text or format outside a locale definition (NFR-005); the Content-Security-Policy stays `'self'` only.\
 **References:** ADR-001 (stack), ADR-004 (store), ADR-005 (CI), ADR-006 (web UI) · FR-004 (day/week view), FR-005 (lunch settings), FR-006 (recording status), NFR-001 (silence), NFR-005 (locales), UC-001, UC-004, UC-005, BR-009, BR-010, BR-011
 

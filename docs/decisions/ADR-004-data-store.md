@@ -14,8 +14,11 @@ setting changes, and 002–004 add corrections, day marks, targets and planned d
 - **Location:** `%LocalAppData%\WorkTimeTracker` — per user, not roaming, not synced; it inherits the
   profile's user-only access rights. The uninstaller removes it (001 K3, ADR-002).
 - **Format:** one **SQLite** file in WAL mode via `Microsoft.Data.Sqlite`; schema changes are
-  forward-only, versioned in the file and applied at open under SQLite's write lock, so whichever
-  process opens first migrates.
+  forward-only, versioned in the file and applied at open under SQLite's write lock.
+- **Who migrates:** the Recorder, at its start (and the developer CLI, on the file it is pointed at).
+  The App migrates only when no Recorder runs; while one runs, the App waits for that Recorder to bring
+  the file to the App's version — up to 30 s, else it reports the file as unusable (001 D1) — so an
+  older Recorder never runs on a schema it does not know.
 - **Shape:** append-only **activity facts**, each with its instant and the local UTC offset in force,
   deduplicated by source key; **coverage spans**; **lunch rules** with the date they apply from.
   **Days, weeks and later balances are never stored** — always derived by the domain core.
@@ -27,7 +30,7 @@ setting changes, and 002–004 add corrections, day marks, targets and planned d
 | Option | Why not |
 |--------|---------|
 | JSON Lines files | Two writing processes need hand-made locking and torn-line recovery; range reads by hand |
-| EF Core + SQLite | A large dependency and a migration-lock protocol for a three-table schema |
+| EF Core + SQLite | A large dependency and a migration-lock protocol for a schema of four small tables |
 | Roaming profile / Documents | Copied to servers or OneDrive — data would leave the laptop |
 | Storing derived days | Every rule fix would need a data migration; owner cut freezing past weeks (brief decision 14) |
 
@@ -41,6 +44,9 @@ setting changes, and 002–004 add corrections, day marks, targets and planned d
   so a reason named later reaches facts already stored, and a name or cause it does not know reads as
   unknown. Stored rows are never rewritten; domain rules decide on reason names only, and the raw reason
   passes through the domain unread.
+- **An upgrade migrates when its new Recorder starts:** the installer stops the old Recorder and starts
+  the new one (001 S3). Should an older Recorder still run, an App opened beside it waits and then
+  reports the file as unusable rather than migrating under it.
 - A settings change never needs a data migration; the stored UTC offset keeps past days in place when
   the laptop's time zone changes.
 - **Hard to undo:** low (one versioned file).
