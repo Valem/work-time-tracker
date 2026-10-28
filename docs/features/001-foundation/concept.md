@@ -131,7 +131,7 @@ work time: a pause counted as work (BR-005) and the evening use (BR-012) are wor
 Infrastructure names a reason from its stored raw reason with the current mapping when facts are read (ADR-004), so a reason named later (fingerprint)
 reaches facts already stored; domain rules decide on reason names only, and the raw reason passes through the domain unread; a name or cause it does not know reads as unknown, never as an error. Lunch rules are superseded, never edited. Workdays
 and weeks are a pure function of facts, coverage and the rules in force — recomputed on read, never stored. The Recorder knows nothing
-about days; Recorder and App meet only in the database. Domain depends on nothing; application declares ports that infrastructure implements;
+about days; Recorder and App exchange data only through the database; beyond it, the App starts the Recorder and reads whether this session's Recorder holds its mutex — for the status (FR-006) and to leave migration to a running Recorder (ADR-004). Domain depends on nothing; application declares ports that infrastructure implements;
 Domain and Application reference neither Windows nor I/O — the architecture test enforces this view, with negative probes. 002–004 add `DayCorrection`, `DayMark`, dated `TargetHours` beside facts.
 
 ### Component Diagram
@@ -155,6 +155,7 @@ flowchart TB
   end
   ui -- bridge messages --> host
   host --> app
+  host -. starts, reads its mutex .-> rec
   rec --> app
   app --> dom
   app -. ports .-> infra
