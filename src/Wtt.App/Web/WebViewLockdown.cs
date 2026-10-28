@@ -10,6 +10,50 @@ namespace Wtt.App.Web;
 /// </summary>
 internal static class WebViewLockdown
 {
+    /// <summary>
+    /// Variables the WebView2 loader reads before the app's own options: browser arguments (a remote debugging port),
+    /// another profile folder, another runtime or channel, a script debugger.
+    /// </summary>
+    private static readonly string[] EnvironmentOverrides =
+    [
+        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        "WEBVIEW2_USER_DATA_FOLDER",
+        "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER",
+        "WEBVIEW2_RELEASE_CHANNEL_PREFERENCE",
+        "WEBVIEW2_CHANNEL_SEARCH_KIND",
+        "WEBVIEW2_RELEASE_CHANNELS",
+        "WEBVIEW2_PIPE_FOR_SCRIPT_DEBUGGER",
+        "WEBVIEW2_WAIT_FOR_SCRIPT_DEBUGGER",
+    ];
+
+    /// <summary>
+    /// Unless the policy honours them, removes the overrides from this process's environment before the web view's
+    /// environment is created, so neither the runtime nor its child processes see them.
+    /// </summary>
+    public static void ClearEnvironmentOverrides(WebViewPolicy policy)
+    {
+        if (policy.EnvironmentOverridesHonoured)
+        {
+            return;
+        }
+
+        foreach (var name in EnvironmentOverrides)
+        {
+            Environment.SetEnvironmentVariable(name, null);
+        }
+    }
+
+    /// <exception cref="InvalidOperationException">The runtime keeps its profile somewhere else than the data folder.</exception>
+    public static void EnsureProfileIn(CoreWebView2Environment environment, string userDataFolder, WebViewPolicy policy)
+    {
+        if (policy.EnvironmentOverridesHonoured || SameFolder(environment.UserDataFolder, userDataFolder))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException($"The web view keeps its profile in '{environment.UserDataFolder}', not in '{userDataFolder}'.");
+    }
+
     /// <param name="language">The language of anything the runtime itself shows, from the app's locale.</param>
     public static CoreWebView2EnvironmentOptions EnvironmentOptions(string language) => new()
     {
@@ -43,4 +87,10 @@ internal static class WebViewLockdown
         view.PermissionRequested += (_, e) => e.State = CoreWebView2PermissionState.Deny;
         view.ProcessFailed += (_, e) => log.Write($"Web view process failed: {e.ProcessFailedKind}, {e.Reason}, exit code {e.ExitCode}");
     }
+
+    private static bool SameFolder(string a, string b) =>
+        string.Equals(
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)),
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
+            StringComparison.OrdinalIgnoreCase);
 }

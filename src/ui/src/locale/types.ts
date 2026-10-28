@@ -60,7 +60,8 @@ export interface Language {
     readonly lunchMinimumOnly: (deducted: string) => string;
     readonly noBreak: string;
     readonly pauseAsWork: (span: string, duration: string) => string;
-    readonly wake: (time: string) => string;
+    /** The times Windows woke alone on this day; it produced no use. */
+    readonly windowsWakes: (times: readonly string[]) => string;
     readonly eveningPause: (span: string, duration: string, after: string) => string;
   };
   readonly settings: {

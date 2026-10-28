@@ -13,6 +13,9 @@ namespace Wtt.App;
 /// </summary>
 internal sealed class MainForm : Form
 {
+    private const int WmSettingChange = 0x001A;
+    private const int WmTimeChange = 0x001E;
+
     private readonly AppFolders folders;
     private readonly ErrorLog log;
     private readonly BridgeHost bridge;
@@ -62,12 +65,29 @@ internal sealed class MainForm : Form
         }
     }
 
+    /// <summary>
+    /// Windows announces a clock or time-zone change to every top-level window; .NET keeps the zone it read first, so
+    /// the cache is dropped and "today", the status time and a saved rule's date follow the new zone.
+    /// </summary>
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg is WmTimeChange or WmSettingChange)
+        {
+            TimeZoneInfo.ClearCachedData();
+        }
+
+        base.WndProc(ref m);
+    }
+
     private async Task ShowAppContentAsync()
     {
+        var policy = WebViewPolicy.ForThisBuild;
+        WebViewLockdown.ClearEnvironmentOverrides(policy);
         var environment = await CoreWebView2Environment.CreateAsync(
             browserExecutableFolder: null,
             userDataFolder: folders.WebViewDataFolder,
             options: WebViewLockdown.EnvironmentOptions(AppLocale.Name));
+        WebViewLockdown.EnsureProfileIn(environment, folders.WebViewDataFolder, policy);
         if (view is null)
         {
             return;
@@ -77,7 +97,7 @@ internal sealed class MainForm : Form
         view.AllowExternalDrop = false;
 
         var core = view.CoreWebView2;
-        WebViewLockdown.Apply(core, WebViewPolicy.ForThisBuild, log);
+        WebViewLockdown.Apply(core, policy, log);
         core.ProcessFailed += OnProcessFailed;
         core.WebMessageReceived += OnWebMessageReceived;
         core.SetVirtualHostNameToFolderMapping(LocalContent.HostName, folders.ContentFolder, CoreWebView2HostResourceAccessKind.Deny);

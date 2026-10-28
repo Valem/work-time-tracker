@@ -23,7 +23,6 @@ internal sealed class Declarations
         [typeof(long)] = "number",
         [typeof(decimal)] = "number",
         [typeof(double)] = "number",
-        [typeof(object)] = "unknown",
         [typeof(JsonElement)] = "unknown",
     };
 

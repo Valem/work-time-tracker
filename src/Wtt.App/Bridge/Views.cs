@@ -23,6 +23,7 @@ internal static class Views
         day.End is { } end ? MinutesOn(end, day.Date) : null,
         day.Blocks.Select(block => Span(block.Start, block.End, day.Date)).ToList(),
         day.Pauses.Select(pause => Pause(pause, RoleOf(pause, day), day.Date)).ToList(),
+        day.WindowsWakes.Select(wake => MinutesOn(wake, day.Date)).ToList(),
         SpanOf(day.NightPause, day.Date),
         new LunchView(SpanOf(day.Lunch.Pause, day.Date), Minutes(day.Lunch.Deducted), BasisOf(day.Lunch.Basis)),
         SpanOf(day.EveningPause, day.Date),
@@ -47,12 +48,8 @@ internal static class Views
             ? Span(evening.End, evening.End + day.EveningUse, day.Date)
             : null;
 
-    private static PauseView Pause(Pause pause, PauseRole role, DateOnly date) => new(
-        MinutesOn(pause.Start, date),
-        MinutesOn(pause.End, date),
-        Minutes(pause.Duration),
-        role,
-        pause.IgnoredWakes.Select(wake => MinutesOn(wake, date)).ToList());
+    private static PauseView Pause(Pause pause, PauseRole role, DateOnly date) =>
+        new(MinutesOn(pause.Start, date), MinutesOn(pause.End, date), Minutes(pause.Duration), role);
 
     private static PauseRole RoleOf(Pause pause, Workday day) =>
         ReferenceEquals(pause, day.NightPause) ? PauseRole.Night

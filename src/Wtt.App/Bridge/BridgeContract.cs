@@ -33,8 +33,8 @@ public enum RefusalCode
 /// <summary>What the UI sends: an id it chose, one of the message types and that type's payload.</summary>
 public sealed record BridgeRequest(int Id, string Type, JsonElement Payload);
 
-/// <summary>The answer to the request with that id.</summary>
-public sealed record BridgeAnswer(int Id, object Result);
+/// <summary>The answer to the request with that id: the message's result record, written as that record's type.</summary>
+public sealed record BridgeAnswer(int Id, JsonElement Result);
 
 /// <summary>A refusal; the id is null when the request's own id could not be read.</summary>
 public sealed record BridgeRefusal(int? Id, Refusal Error);
@@ -45,8 +45,10 @@ public sealed record Refusal(RefusalCode Code);
 public sealed record BridgeMessage(string Type, Type Request, Type Result);
 
 /// <summary>
-/// The contract between the UI and the host, defined once: the message types, their records, the refusal codes, and the
-/// one serializer that writes and reads them. Wtt.BridgeTypes writes the UI's declarations from these.
+/// The contract between the UI and the host, defined once: each message type registered with its records and its
+/// handler, the refusal codes, and the one serializer that writes and reads them. Wtt.BridgeTypes writes the UI's
+/// declarations from <see cref="Messages"/>, which that registration yields, so the UI knows exactly the types the
+/// host answers.
 /// </summary>
 public static class BridgeContract
 {
@@ -54,16 +56,31 @@ public static class BridgeContract
 
     public static JsonSerializerOptions Json { get; } = CreateJson();
 
-    public static IReadOnlyList<BridgeMessage> Messages { get; } =
+    /// <exception cref="InvalidOperationException">A message type is registered twice; the contract cannot initialize.</exception>
+    internal static IReadOnlyList<BridgeRoute> Routes { get; } = OncePerType(
     [
-        new("week.get", typeof(WeekRequest), typeof(WeekView)),
-        new("day.get", typeof(DayRequest), typeof(DayView)),
-        new("status.get", typeof(StatusRequest), typeof(StatusView)),
-        new("lunchRule.get", typeof(LunchRuleRequest), typeof(LunchRuleView)),
-        new("lunchRule.save", typeof(LunchRuleInput), typeof(LunchRuleView)),
-    ];
+        BridgeRoute.For<WeekRequest, WeekView>("week.get", handlers => handlers.WeekAsync),
+        BridgeRoute.For<DayRequest, DayView>("day.get", handlers => handlers.DayAsync),
+        BridgeRoute.For<StatusRequest, StatusView>("status.get", handlers => handlers.StatusAsync),
+        BridgeRoute.For<LunchRuleRequest, LunchRuleView>("lunchRule.get", handlers => handlers.LunchRuleAsync),
+        BridgeRoute.For<LunchRuleInput, LunchRuleView>("lunchRule.save", handlers => handlers.SaveLunchRuleAsync),
+    ]);
+
+    public static IReadOnlyList<BridgeMessage> Messages { get; } = Routes.Select(route => route.Message).ToList();
 
     public static IReadOnlyList<Type> Envelopes { get; } = [typeof(BridgeRequest), typeof(BridgeAnswer), typeof(BridgeRefusal)];
+
+    private static IReadOnlyList<BridgeRoute> OncePerType(IReadOnlyList<BridgeRoute> routes)
+    {
+        var twice = routes
+            .GroupBy(route => route.Message.Type, StringComparer.Ordinal)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToList();
+        return twice.Count == 0
+            ? routes
+            : throw new InvalidOperationException($"Bridge message types registered more than once: {string.Join(", ", twice)}.");
+    }
 
     /// <summary>
     /// Web defaults (camelCase), enums as camelCase strings, and strict reading: a missing, extra, null or mistyped field

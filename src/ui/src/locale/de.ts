@@ -42,7 +42,7 @@ export const german: Language = {
     timeline: 'Tagesverlauf',
     work: 'Arbeit',
     eveningUse: 'Nutzung nach der Abendpause',
-    ignoredWake: 'Windows aufgewacht, nicht gezählt',
+    ignoredWake: 'Windows von selbst aufgewacht',
     roles: {
       work: 'Pause, als Arbeit gezählt',
       lunch: 'Mittagspause',
@@ -57,7 +57,7 @@ export const german: Language = {
     lunchMinimumOnly: (deducted) => `Keine Mittagspause: die Mindestpause von ${deducted} ist abgezogen.`,
     noBreak: 'Keine Pause abgezogen.',
     pauseAsWork: (span, duration) => `Pause ${span} (${duration}): zählt als Arbeit.`,
-    wake: (time) => `Windows um ${time} aufgewacht: zählt nicht.`,
+    windowsWakes: (times) => `Windows ist von selbst aufgewacht um ${times.join(', ')}: zählt nicht.`,
     eveningPause: (span, duration, after) =>
       `Abendpause ${span} (${duration}): beendet den Tag; die ${after} danach zählen dazu.`,
   },

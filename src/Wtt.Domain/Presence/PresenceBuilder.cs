@@ -21,8 +21,25 @@ public sealed class PresenceBuilder : IPresenceBuilder
         }
 
         var uses = tracker.Finish(range.End);
-        return new PresenceTimeline(uses, PausesBetween(uses, Wakes(effective)));
+        var windowsWakes = WindowsOwnWakes(effective, uses, range.End);
+        return new PresenceTimeline(uses, PausesBetween(uses, windowsWakes), windowsWakes);
     }
+
+    /// <summary>
+    /// The wakes Windows did alone: no use overlaps the stretch from the wake until the laptop next goes to standby,
+    /// shuts down or boots — no unlock, sign-in or qualifying input came in it, so the wake produced no use.
+    /// </summary>
+    private static List<DateTimeOffset> WindowsOwnWakes(IReadOnlyList<EffectiveFact> effective, IReadOnlyList<UseSpan> uses, DateTimeOffset rangeEnd) =>
+        Wakes(effective)
+            .Where(wake =>
+            {
+                var asleepAgain = effective
+                    .Select(fact => fact.Fact)
+                    .FirstOrDefault(fact => fact.At > wake && fact.Kind is FactKind.StandbyEnter or FactKind.Shutdown or FactKind.Boot)?.At
+                    ?? rangeEnd;
+                return !uses.Any(use => use.End > wake && use.Start < asleepAgain);
+            })
+            .ToList();
 
     /// <summary>
     /// One wake per return from standby: Windows may report the same resume several times

@@ -42,7 +42,8 @@ export function DayScreen({ date, tick, onShowWeek }: DayScreenProps) {
         <Figure term={language.day.break} value={formats.duration(day.break)} />
         <Figure term={language.day.total} value={formats.duration(day.total)} strong />
       </dl>
-      {day.start === null ? <p class="pending">{language.day.noUse}</p> : <DayDetails day={day} words={words} />}
+      {day.start === null && <p class="pending">{language.day.noUse}</p>}
+      {(day.start !== null || day.windowsWakes.length > 0) && <DayDetails day={day} words={words} />}
     </section>
   );
 }
@@ -66,23 +67,17 @@ function DayDetails({ day, words }: { day: DayView; words: Words }) {
         {day.pauses.map((pause) => (
           <li key={pause.start} data-role={pause.role}>
             {explain(pause, day, words)}
-            {pause.ignoredWakes.length > 0 && (
-              <ul>
-                {pause.ignoredWakes.map((wake) => (
-                  <li key={wake} class="wake-note">
-                    {language.day.wake(words.formats.time(wake))}
-                  </li>
-                ))}
-              </ul>
-            )}
           </li>
         ))}
-        {day.lunch.pause === null && (
+        {day.start !== null && day.lunch.pause === null && (
           <li data-role="lunch">
             {day.lunch.basis === 'tierMinimum'
               ? language.day.lunchMinimumOnly(words.formats.duration(day.lunch.deducted))
               : language.day.noBreak}
           </li>
+        )}
+        {day.windowsWakes.length > 0 && (
+          <li class="wake-note">{language.day.windowsWakes(day.windowsWakes.map(words.formats.time))}</li>
         )}
       </ul>
     </>
@@ -114,7 +109,6 @@ function placed(start: number, end: number): JSX.CSSProperties {
 
 function Timeline({ day, words }: { day: DayView; words: Words }) {
   const { language, formats } = words;
-  const wakes = day.pauses.flatMap((pause) => pause.ignoredWakes);
   return (
     <figure class="timeline">
       <figcaption>{language.day.timeline}</figcaption>
@@ -142,7 +136,7 @@ function Timeline({ day, words }: { day: DayView; words: Words }) {
             title={`${language.day.eveningUse} ${words.span(day.eveningUse)}`}
           />
         )}
-        {wakes.map((wake) => (
+        {day.windowsWakes.map((wake) => (
           <span
             key={`wake-${wake}`}
             class="wake"

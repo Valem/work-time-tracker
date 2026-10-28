@@ -25,7 +25,8 @@ public sealed record LunchDeduction(Pause? Pause, TimeSpan Deducted, LunchBasis 
 /// One local date's work, derived from presence and the rule in force — never stored.
 /// Blocks run from start to end and split only at the night pause; the lunch deduction lies inside them.
 /// An evening pause ends the day where it starts: the use after it is no block and adds only
-/// <see cref="EveningUse"/> to the attendance.
+/// <see cref="EveningUse"/> to the attendance. <see cref="WindowsWakes"/> are the wakes Windows did alone on this
+/// local date, before, inside or after the day's work.
 /// </summary>
 public sealed record Workday(
     DateOnly Date,
@@ -36,11 +37,12 @@ public sealed record Workday(
     TimeSpan Attendance,
     TimeSpan Total,
     Precision Precision,
+    IReadOnlyList<DateTimeOffset> WindowsWakes,
     Pause? EveningPause = null,
     TimeSpan EveningUse = default)
 {
-    public static Workday WithoutUse(DateOnly date) =>
-        new(date, [], [], null, LunchDeduction.None, TimeSpan.Zero, TimeSpan.Zero, Precision.Exact);
+    public static Workday WithoutUse(DateOnly date, IReadOnlyList<DateTimeOffset> windowsWakes) =>
+        new(date, [], [], null, LunchDeduction.None, TimeSpan.Zero, TimeSpan.Zero, Precision.Exact, windowsWakes);
 
     public bool HasUse => Blocks.Count > 0;
 

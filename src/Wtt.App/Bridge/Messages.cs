@@ -32,7 +32,7 @@ public enum PauseRole
     Evening,
 }
 
-public sealed record PauseView(int Start, int End, int Minutes, PauseRole Role, IReadOnlyList<int> IgnoredWakes);
+public sealed record PauseView(int Start, int End, int Minutes, PauseRole Role);
 
 /// <summary>Why the break is what it is: nothing deducted, the lunch pause whole, or the tier minimum above it.</summary>
 public enum DeductionBasis
@@ -44,6 +44,7 @@ public enum DeductionBasis
 
 public sealed record LunchView(DaySpan? Pause, int Deducted, DeductionBasis Basis);
 
+/// <summary>A day; its Windows wakes are the times on this date when Windows woke alone and produced no use.</summary>
 public sealed record DayView(
     CalendarDay Day,
     CalendarDay Monday,
@@ -51,6 +52,7 @@ public sealed record DayView(
     int? End,
     IReadOnlyList<DaySpan> Blocks,
     IReadOnlyList<PauseView> Pauses,
+    IReadOnlyList<int> WindowsWakes,
     DaySpan? NightPause,
     LunchView Lunch,
     DaySpan? EveningPause,

@@ -16,7 +16,9 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 
 - **Library:** Preact with TypeScript, bundled by Vite on Node LTS; its type check runs in the verify
   command (ADR-005). The screens follow the 001 concept's descriptions (week, day timeline, settings,
-  recording status).
+  recording status). Vite's esbuild and Rollup run as their WebAssembly builds (`esbuild-wasm`,
+  `@rollup/wasm-node`, npm overrides), because Smart App Control may block their unsigned native binaries
+  on a development laptop, while WebAssembly runs inside the signed Node.js.
 - **Serving:** the built assets ship in the install folder and load from a virtual host mapped to
   it; no dev server or remote URL in a release build.
 - **Bridge:** typed JSON request/response messages over `chrome.webview.postMessage` and

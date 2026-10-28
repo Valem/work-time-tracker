@@ -1,5 +1,6 @@
 using Wtt.Domain.Presence;
 using Wtt.Domain.Rules;
+using Wtt.Domain.Time;
 
 namespace Wtt.Domain.Workdays;
 
@@ -15,9 +16,10 @@ public sealed class WorkdayCalculator : IWorkdayCalculator
     {
         var pieces = DayPiece.SplitAtMidnight(presence.Uses);
         var today = pieces.Where(piece => piece.Date == date).ToList();
+        var windowsWakes = presence.WindowsWakes.Where(wake => wake.LocalDate() == date).ToList();
         if (today.Count == 0)
         {
-            return Workday.WithoutUse(date);
+            return Workday.WithoutUse(date, windowsWakes);
         }
 
         var previous = pieces.LastOrDefault(piece => piece.Date < date);
@@ -48,6 +50,7 @@ public sealed class WorkdayCalculator : IWorkdayCalculator
             attendance,
             attendance - lunch.Deducted,
             precision,
+            windowsWakes,
             eveningPause,
             eveningUse);
     }

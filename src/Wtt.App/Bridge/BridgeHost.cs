@@ -12,13 +12,14 @@ internal sealed record BridgeReply(string Json, bool DataFileFailed);
 
 /// <summary>
 /// Reads a message from the page and answers it. Only the app's own page is answered, and only for the contract's message
-/// types; a payload is read strictly and checked before anything runs. A refusal carries a code and nothing else — the
+/// types, each by the handler registered for it; a payload is read strictly and checked before anything runs, and a
+/// result is written as its message's result record, never as whatever object the handler returned. A refusal carries a code and nothing else — the
 /// details, exception included, go to the error log only.
 /// </summary>
 internal sealed class BridgeHost(BridgeHandlers handlers, ErrorLog log)
 {
-    private static readonly Dictionary<string, BridgeMessage> MessagesByType =
-        BridgeContract.Messages.ToDictionary(message => message.Type, StringComparer.Ordinal);
+    private static readonly Dictionary<string, BridgeRoute> RoutesByType =
+        BridgeContract.Routes.ToDictionary(route => route.Message.Type, StringComparer.Ordinal);
 
     /// <param name="source">The address of the document that sent the message.</param>
     /// <param name="json">The message as the page posted it.</param>
@@ -35,10 +36,11 @@ internal sealed class BridgeHost(BridgeHandlers handlers, ErrorLog log)
         try
         {
             request = Read<BridgeRequest>(json);
-            var message = MessagesByType.GetValueOrDefault(request.Type) ?? throw new BridgeRefusalException(RefusalCode.UnknownType);
-            var payload = ReadPayload(request.Payload, message.Request);
-            var result = await handlers.AnswerAsync(payload);
-            return new BridgeReply(JsonSerializer.Serialize(new BridgeAnswer(request.Id, result), BridgeContract.Json), DataFileFailed: false);
+            var route = RoutesByType.GetValueOrDefault(request.Type) ?? throw new BridgeRefusalException(RefusalCode.UnknownType);
+            var payload = ReadPayload(request.Payload, route.Message.Request);
+            var result = await route.AnswerAsync(handlers, payload);
+            var answer = new BridgeAnswer(request.Id, JsonSerializer.SerializeToElement(result, route.Message.Result, BridgeContract.Json));
+            return new BridgeReply(JsonSerializer.Serialize(answer, BridgeContract.Json), DataFileFailed: false);
         }
         catch (Exception failure)
         {
