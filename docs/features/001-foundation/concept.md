@@ -442,5 +442,5 @@ a data file that cannot be opened (newer, damaged, locked) or fails while the ap
 | S4 | The winget listing's description text | Public text a colleague reads before installing | Phase-2 winget template | Keep (owner) |
 | V1 | Invalid lunch settings are refused with their reason; nothing is saved | A wrong entry needs an answer, not a silent failure | Phase-3 readiness | Keep (owner) |
 | R1 | The window reloads the app after its renderer crashed | Otherwise the window stays blank | Phase-3 readiness | Cut (owner): a message asks to restart the app |
-| D1 | A data file that cannot be opened (newer, damaged, locked) shows as a problem naming the error log's path, e.g. «Details: %LocalAppData%\WorkTimeTracker\errors.log» | The person sees why nothing shows and where the details are | Phase-3 design review | Keep (owner) |
+| D1 | A data file that cannot be opened (newer, damaged, locked) or fails while the app runs shows as a problem naming the error log's path, e.g. «Details: %LocalAppData%\WorkTimeTracker\errors.log» | The person sees why nothing shows and where the details are | Phase-3 design review | Keep (owner) |
 | L1 | The day's legend lists only the kinds that occur that day | Once the legend carries times, a kind with none is noise | Phase-3 owner feedback | Keep (owner) |
