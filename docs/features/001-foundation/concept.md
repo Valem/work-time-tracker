@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.5.4 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.1 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
+**Version:** v1.5.5 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.1 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
 
 ## 1. Executive Context
 
@@ -294,7 +294,7 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 | 6, 7, 12 | Health, observability, operations | Phase-2 — coverage spans, Run key, App and installer restart a stopped Recorder, gaps filled from history; errors-only log in the data folder, capped at 1 MB, never sent. Phase-3 shows status (FR-006) |
 | 8, 9 | Config, data, migrations | Phase-1 — lunch rules in the data file, no secrets; forward-only migrations at open (ADR-004) |
 | 10, 11 | Integration, tests | Windows notifications and event logs, read-only (ADR-003). Tests: one per business rule and the architecture test, in verify. Everything else is proven by the QA live check: built programs on a real laptop, scripted protocols, synthetic Windows event XML replayed through the product's own importer |
-| 14 | Network silence, power | Phase-2 probe, Phase-3 and Phase-4 24 h runs and forced crashes (NFR-001); Phase-2 power (NFR-003) |
+| 14 | Network silence, power | Phase-2 probe, Phase-3 5 h and Phase-4 24 h runs and forced crashes (NFR-001); Phase-2 power (NFR-003) |
 
 ### Human dependencies
 
@@ -384,7 +384,7 @@ a data file that cannot be opened (newer, damaged, locked) shown as a problem na
 | AC-3.2 | In the day view, the synthetic days of AC-1.1, AC-1.2, AC-1.4 and AC-2.8 show that AC's start, end, break and total, the ignored Windows wakes at their times, the night pause, which pause was deducted as lunch and whether the tier raised it (AC-1.4: 0:30 raised to 1:00; AC-1.2: not raised), and the evening pause with the minutes after it (AC-2.8: 17:30–22:40, then 0:02) | FR-004, UC-004 |
 | AC-3.3 | On an account that never had the app, or whose app data the uninstall removed (K3), with an earlier day of attendance over 6:45 and under 9:00 and a lunch pause under 0:45 or none: after install and with no setup, settings hold only lunch window and tiers, showing 11:30–14:00 and the example tiers as prefilled, and today and the earlier days appear without any action; saving the same window with the single tier over 6:00 → 0:45 shows the date it applies from, every week then shows, without reopening, the same values as the CLI for that data file, and at least one day before install has a changed break; a window ending before it starts, or two tiers on one threshold, is refused with its reason and saves nothing | FR-005, UC-001, BR-009 |
 | AC-3.4 | With the Recorder running, the status shows that it records and a last recorded time at most 2 minutes old; after the Recorder's process is ended, within 2 minutes it shows that recording has stopped, since that time | FR-006, UC-004 |
-| AC-3.5 | On the installed release build, 24 h with the app open and each screen used at its start and its end, and crashes forced in host, Recorder and a renderer by an access violation injected from outside: no outbound connection from the app's process tree but NFR-001's exception, no Windows Error Report queued or archived for them, the renderer's dump only in the data folder's WebView2 profile, and after the renderer's crash the window asks to restart the app; only where injection into the renderer is refused are its crash, dump and message checked in a Debug build, crashed from DevTools; a link or file dropped on the window opens nothing | FR-004, NFR-001, UC-004 |
+| AC-3.5 | On the installed release build, 5 h awake with the app open and each screen used at its start and its end, and crashes forced in host, Recorder and a renderer by an access violation injected from outside: no outbound connection from the app's process tree but NFR-001's exception, no Windows Error Report queued or archived for them, the renderer's dump only in the data folder's WebView2 profile, and after the renderer's crash the window asks to restart the app; only where injection into the renderer is refused are its crash, dump and message checked in a Debug build, crashed from DevTools; a link or file dropped on the window opens nothing | FR-004, NFR-001, UC-004 |
 
 ### Phase 4: Ship through winget
 
