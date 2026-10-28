@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.5.7 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.1 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
+**Version:** v1.5.8 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.1 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
 
 ## 1. Executive Context
 
@@ -369,7 +369,7 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 **Milestone:** M2 — on the target laptop the owner builds and installs the local build and uses it for a working week: `pwsh tools/run.ps1 -Installer`, then `.\artifacts\installer\wtt-setup.exe /VERYSILENT /CURRENTUSER`. Phase-4 waits until they have.\
 **Scope:** one window in German with Swiss formats, every text and format from the de-CH locale (NFR-005), the recording status always in view (whether it records and when it last recorded, or since when it has stopped);\
 week — Monday–Sunday rows with start, end (24:00 past midnight), break, total and rebuilt mark, the week total, previous and next week as the host supplies them from the oldest kept fact's week to the current one, opening on the current week;\
-day, opened from its row — a 00:00–24:00 timeline of work blocks and pauses with the ignored Windows wakes, the night pause, the lunch pause with what was deducted and whether the tier raised it (A1), the evening pause and the minutes after it (E2);\
+day, opened from its row — a 00:00–24:00 timeline of work blocks and pauses with the ignored Windows wakes, the night pause, the lunch pause with what was deducted and whether the tier raised it (A1), the evening pause and the minutes after it (E2); its legend lists the kinds that occur that day, each with the start and end of each of its spans (L1), and the explanation of the day stays closed until the person opens it;\
 settings — lunch window and tiers (add, remove), prefilled until the first save (P1), a save showing the date it applies from (K4), an invalid entry refused with its reason (V1);\
 the bridge (§5); web-view lockdown and local crash reports (ADR-006), web messages enabled for the app's own origin only, a crashed renderer replaced by a message asking to restart the app (R1);\
 a data file that cannot be opened (newer, damaged, locked) shown as a problem naming the error log's path (D1).\
@@ -430,3 +430,4 @@ a data file that cannot be opened (newer, damaged, locked) shown as a problem na
 | V1 | Invalid lunch settings are refused with their reason; nothing is saved | A wrong entry needs an answer, not a silent failure | Phase-3 readiness | Keep (owner) |
 | R1 | The window reloads the app after its renderer crashed | Otherwise the window stays blank | Phase-3 readiness | Cut (owner): a message asks to restart the app |
 | D1 | A data file that cannot be opened (newer, damaged, locked) shows as a problem naming the error log's path, e.g. «Details: %LocalAppData%\WorkTimeTracker\errors.log» | The person sees why nothing shows and where the details are | Phase-3 design review | Keep (owner) |
+| L1 | The day's legend lists only the kinds that occur that day | Once the legend carries times, a kind with none is noise | Phase-3 owner feedback | Keep (owner) |
