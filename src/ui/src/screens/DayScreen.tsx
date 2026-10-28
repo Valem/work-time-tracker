@@ -135,12 +135,12 @@ function Timeline({ day, words }: { day: DayView; words: Words }) {
     <figure class="timeline">
       <figcaption>{language.day.timeline}</figcaption>
       <div class="track">
-        {day.blocks.map((block) => (
+        {day.workSpans.map((span) => (
           <span
-            key={`block-${block.start}`}
+            key={`work-${span.start}`}
             class="segment work"
-            style={placed(block.start, block.end)}
-            title={`${language.day.work} ${words.span(block)}`}
+            style={placed(span.start, span.end)}
+            title={`${language.day.work} ${words.span(span)}`}
           />
         ))}
         {day.pauses.map((pause) => (

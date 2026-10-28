@@ -429,8 +429,9 @@ main {
   background: var(--work-soft);
 }
 
-.legend-wake::before {
+.legend li.legend-wake::before {
   width: 2px;
+  border-radius: 0;
   background: var(--wake);
 }
 

@@ -45,15 +45,14 @@ public enum DeductionBasis
 public sealed record LunchView(DaySpan? Pause, int Deducted, DeductionBasis Basis);
 
 /// <summary>
-/// A day; its work spans are its blocks without the pauses inside them, and its Windows wakes are the times on this date
-/// when Windows woke alone and produced no use.
+/// A day; its work spans are the domain's work blocks without the pauses inside them, and its Windows wakes are the times
+/// on this date when Windows woke alone and produced no use.
 /// </summary>
 public sealed record DayView(
     CalendarDay Day,
     CalendarDay Monday,
     int? Start,
     int? End,
-    IReadOnlyList<DaySpan> Blocks,
     IReadOnlyList<DaySpan> WorkSpans,
     IReadOnlyList<PauseView> Pauses,
     IReadOnlyList<int> WindowsWakes,

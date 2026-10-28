@@ -21,7 +21,6 @@ internal static class Views
         Day(WorkWeek.MondayOf(day.Date)),
         day.Start is { } start ? MinutesOn(start, day.Date) : null,
         day.End is { } end ? MinutesOn(end, day.Date) : null,
-        day.Blocks.Select(block => Span(block.Start, block.End, day.Date)).ToList(),
         day.WorkSpans.Select(span => Span(span.Start, span.End, day.Date)).ToList(),
         day.Pauses.Select(pause => Pause(pause, RoleOf(pause, day), day.Date)).ToList(),
         day.WindowsWakes.Select(wake => MinutesOn(wake, day.Date)).ToList(),
