@@ -1,5 +1,6 @@
 import type { JSX } from 'preact';
-import type { DayView, PauseView } from '../bridge/contract';
+import { useState } from 'preact/hooks';
+import type { DayView, PauseRole, PauseView } from '../bridge/contract';
 import { useAnswer } from '../bridge/useAnswer';
 import { useWords, type Words } from '../locale/context';
 import { Pending } from './Notice';
@@ -58,12 +59,32 @@ function Figure({ term, value, strong = false }: { term: string; value: string; 
 }
 
 function DayDetails({ day, words }: { day: DayView; words: Words }) {
-  const { language } = words;
   return (
     <>
       <Timeline day={day} words={words} />
-      <h2>{language.day.explained}</h2>
-      <ul class="explained">
+      <Explanation day={day} words={words} />
+    </>
+  );
+}
+
+/** Why the day reads as it does; closed until the person opens it, each time a day opens. */
+function Explanation({ day, words }: { day: DayView; words: Words }) {
+  const { language } = words;
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <h2>
+        <button
+          type="button"
+          class="disclose"
+          aria-expanded={open}
+          aria-controls="day-explained"
+          onClick={() => setOpen(!open)}
+        >
+          {language.day.explained}
+        </button>
+      </h2>
+      <ul id="day-explained" class="explained" hidden={!open}>
         {day.pauses.map((pause) => (
           <li key={pause.start} data-role={pause.role}>
             {explain(pause, day, words)}
@@ -109,6 +130,7 @@ function placed(start: number, end: number): JSX.CSSProperties {
 
 function Timeline({ day, words }: { day: DayView; words: Words }) {
   const { language, formats } = words;
+  const legend = legendOf(day, words);
   return (
     <figure class="timeline">
       <figcaption>{language.day.timeline}</figcaption>
@@ -152,15 +174,38 @@ function Timeline({ day, words }: { day: DayView; words: Words }) {
           </span>
         ))}
       </div>
-      <ul class="legend">
-        <li class="legend-work">{language.day.work}</li>
-        <li class="legend-pause-work">{language.day.roles.work}</li>
-        <li class="legend-pause-lunch">{language.day.roles.lunch}</li>
-        <li class="legend-pause-night">{language.day.roles.night}</li>
-        <li class="legend-pause-evening">{language.day.roles.evening}</li>
-        <li class="legend-evening-use">{language.day.eveningUse}</li>
-        <li class="legend-wake">{language.day.ignoredWake}</li>
-      </ul>
+      {legend.length > 0 && (
+        <ul class="legend">
+          {legend.map((entry) => (
+            <li key={entry.kind} class={`legend-${entry.kind}`}>
+              {language.day.legendEntry(entry.label, entry.times)}
+            </li>
+          ))}
+        </ul>
+      )}
     </figure>
   );
+}
+
+/** One kind on the timeline, named as in the stylesheet, with the formatted span or time of each place it shows. */
+interface LegendEntry {
+  readonly kind: string;
+  readonly label: string;
+  readonly times: readonly string[];
+}
+
+/** The kinds that occur on the day, in the legend's order, each with its spans in the order the host sent them. */
+function legendOf(day: DayView, words: Words): LegendEntry[] {
+  const { language, formats } = words;
+  const pausesAs = (role: PauseRole): string[] => day.pauses.filter((pause) => pause.role === role).map(words.span);
+  const entries: LegendEntry[] = [
+    { kind: 'work', label: language.day.work, times: day.workSpans.map(words.span) },
+    { kind: 'pause-work', label: language.day.roles.work, times: pausesAs('work') },
+    { kind: 'pause-lunch', label: language.day.roles.lunch, times: pausesAs('lunch') },
+    { kind: 'pause-night', label: language.day.roles.night, times: pausesAs('night') },
+    { kind: 'pause-evening', label: language.day.roles.evening, times: pausesAs('evening') },
+    { kind: 'evening-use', label: language.day.eveningUse, times: day.eveningUse ? [words.span(day.eveningUse)] : [] },
+    { kind: 'wake', label: language.day.ignoredWake, times: day.windowsWakes.map(formats.time) },
+  ];
+  return entries.filter((entry) => entry.times.length > 0);
 }

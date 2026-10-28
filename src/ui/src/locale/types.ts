@@ -53,6 +53,8 @@ export interface Language {
     readonly eveningUse: string;
     readonly ignoredWake: string;
     readonly roles: Readonly<Record<PauseRole, string>>;
+    /** One kind in the timeline's legend, with the span or time of each place it shows that day. */
+    readonly legendEntry: (kind: string, times: readonly string[]) => string;
     readonly explained: string;
     readonly nightPause: (span: string, duration: string) => string;
     readonly lunchWhole: (span: string, duration: string) => string;

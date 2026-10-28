@@ -390,6 +390,7 @@ main {
   list-style: none;
   color: var(--muted);
   font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .legend li::before {
@@ -431,6 +432,28 @@ main {
 .legend-wake::before {
   width: 2px;
   background: var(--wake);
+}
+
+.disclose {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.disclose::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+}
+
+.disclose[aria-expanded="true"]::before {
+  transform: rotate(45deg);
 }
 
 .explained {

@@ -49,6 +49,7 @@ export const german: Language = {
       night: 'Nachtpause',
       evening: 'Abendpause',
     },
+    legendEntry: (kind, times) => `${kind} ${times.join(', ')}`,
     explained: 'So kommt der Tag zustande',
     nightPause: (span, duration) => `Nachtpause ${span} (${duration}): zählt nicht.`,
     lunchWhole: (span, duration) => `Mittagspause ${span} (${duration}): ganz abgezogen.`,

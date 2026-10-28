@@ -57,4 +57,35 @@ public sealed record Workday(
     public TimeSpan Break => Lunch.Deducted;
 
     public bool IsRebuilt => Precision == Precision.Rebuilt;
+
+    /// <summary>
+    /// The blocks without the pauses inside them — the lunch pause and the pauses counted as work — in time order: the
+    /// stretches between start and end that no pause covers.
+    /// </summary>
+    public IReadOnlyList<WorkBlock> WorkSpans => [.. Blocks.SelectMany(block => Uncovered(block, Pauses))];
+
+    private static List<WorkBlock> Uncovered(WorkBlock block, IReadOnlyList<Pause> pauses)
+    {
+        var spans = new List<WorkBlock>();
+        var from = block.Start;
+        foreach (var pause in pauses.Where(pause => pause.Start < block.End && pause.End > block.Start))
+        {
+            if (pause.Start > from)
+            {
+                spans.Add(new WorkBlock(from, pause.Start));
+            }
+
+            if (pause.End > from)
+            {
+                from = pause.End;
+            }
+        }
+
+        if (block.End > from)
+        {
+            spans.Add(new WorkBlock(from, block.End));
+        }
+
+        return spans;
+    }
 }
