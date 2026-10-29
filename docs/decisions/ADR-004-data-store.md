@@ -1,13 +1,13 @@
 # ADR-004: Data — one SQLite file in the person's local profile; facts stored, days derived
 
 **Status:** proposed · **Decided by:** owner (local, non-roaming, kept until uninstall; past weeks not
-frozen) · agent (format, shape) · **Introduced by:** 001-foundation
+frozen) · agent (format, shape) · **Introduced by:** 001-foundation · **Amended by:** 002-holiday-planner
 
 ## Context
 
 Data never leaves the laptop and is readable only by its person (vision). Two processes touch it: the
-Recorder appends facts, the App reads and saves settings. Days must be recomputable when a rule or a
-setting changes, and 002–004 add corrections, day marks, targets and planned days on top.
+Recorder appends facts, the App reads them and saves settings, the holiday plan and the public holidays it
+loads. Days must be recomputable when a rule or a setting changes, and 002 adds the holiday plan on top.
 
 ## Decision
 
@@ -20,10 +20,12 @@ setting changes, and 002–004 add corrections, day marks, targets and planned d
   the file to the App's version — up to 30 s, else it reports the file as unusable (001 D1) — so an
   older Recorder never runs on a schema it does not know.
 - **Shape:** append-only **activity facts**, each with its instant and the local UTC offset in force,
-  deduplicated by source key; **coverage spans**; **lunch rules** with the date they apply from.
-  **Days, weeks and later balances are never stored** — always derived by the domain core.
+  deduplicated by source key; **coverage spans**; **lunch rules** with the date they apply from; from
+  schema 2 the **holiday plan's inputs** and the **loaded public-holiday years** (ADR-008).
+  **Days, weeks, day statuses and holiday counts are never stored** — always derived by the domain core.
 - **Retention:** nothing is pruned (001 K3): ~100–300 facts a day, years fit in a few MB.
-- 002–004 add input tables beside the facts; facts and the Recorder never change for them.
+- The plan's tables sit beside the facts; facts and recording never change for them — the Recorder only
+  migrates the file to schema 2.
 
 ## Rejected alternatives
 
@@ -37,8 +39,10 @@ setting changes, and 002–004 add corrections, day marks, targets and planned d
 ## Consequences
 
 - **A rule fix shipped in an update may change past weeks** — accepted by the owner (brief decision 14).
-- **Uninstall deletes all history** older than Windows' own logs; an export (vision idea) is the later
-  remedy.
+- **Uninstall deletes all history** older than Windows' own logs, and the holiday plans; an export (vision
+  idea) is the later remedy.
+- **Forward-only:** a file migrated by a newer Recorder is refused as newer by an older build (001 D1); going
+  back to an older release means starting from an empty data file.
 - **Facts keep Windows' raw reason; names are derived on read.** Infrastructure's read path of the
   fact journal names each reason from its stored raw reason with the mapping of the running version,
   so a reason named later reaches facts already stored, and a name or cause it does not know reads as

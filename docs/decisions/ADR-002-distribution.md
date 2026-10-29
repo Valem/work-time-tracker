@@ -1,12 +1,13 @@
 # ADR-002: Distribution — per-user installer on GitHub Releases, listed in winget's community repository
 
 **Status:** proposed · **Decided by:** owner (channel, public repo, per-user, unsigned at first) ·
-agent (installer type, Recorder autostart) · **owner, decided 2026-10-24:** the per-machine fallback · **Introduced by:** 001-foundation
+agent (installer type, Recorder autostart) · **owner, decided 2026-10-24:** the per-machine fallback · **Introduced by:** 001-foundation · **Amended by:** 002-holiday-planner
 
 ## Context
 
 Colleagues install it themselves and it must work without explanation (vision). The drivers rule out
-paid code signing, a running cost and any network code in the app. The Microsoft Store can be blocked on
+paid code signing, a running cost and any network code in the app but the public-holiday request
+(ADR-007). The Microsoft Store can be blocked on
 company-managed laptops while winget works there (brief decision 12). winget installs an
 MSIX only with a trusted signature, so an unsigned MSIX is not an option. The Recorder must start at
 every sign-in, without admin rights.
@@ -26,7 +27,8 @@ every sign-in, without admin rights.
   users' data folders, so 001 K3 holds only partly there.
 - **Channel:** the installer is attached to a **GitHub Release** of the public repository (ADR-005) and
   listed in **winget's community repository** (`microsoft/winget-pkgs`): `winget install <id>`,
-  updates by `winget upgrade`. The app contains **no update and no network code** (outcome 7).
+  updates by `winget upgrade`. The app contains **no update code**; its only network code is the App
+  host's public-holiday request (ADR-007).
 - **Recorder autostart:** a per-user `Run` value under `HKCU\…\CurrentVersion\Run`, written by the
   installer and removed by the uninstaller; visible and switchable in Settings → Apps → Startup. The
   App starts the Recorder when it finds it stopped.
@@ -43,7 +45,7 @@ every sign-in, without admin rights.
 | Per-user MSI (WiX) | Per-user MSI has awkward upgrade and elevation quirks; Inno handles per-user natively |
 | Portable / zip in winget | No uninstaller to remove the autostart entry and the data |
 | Logon scheduled task for the Recorder | An at-logon trigger needs admin to register |
-| Velopack or another self-updater | The update check is a network call from the app (outcome 7) |
+| Velopack or another self-updater | The update check is a network call the drivers do not allow |
 
 ## Consequences — what this commits the owner to
 

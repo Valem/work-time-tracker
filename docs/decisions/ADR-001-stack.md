@@ -1,7 +1,7 @@
 # ADR-001: Stack — .NET 10 LTS (C#) with a native host window and a web UI in WebView2
 
 **Status:** proposed · **Decided by:** owner (web UI over WPF, .NET) · agent (host framework, packages)
-· **Introduced by:** 001-foundation
+· **Introduced by:** 001-foundation · **Amended by:** 002-holiday-planner
 
 ## Context
 
@@ -16,7 +16,8 @@ network traffic that must be configured and measured (ADR-006).
 
 - **.NET 10 LTS, C#** for everything that is not the UI: the domain core and application layer as
   plain `net10.0` libraries without Windows calls; the infrastructure adapters, the headless
-  **Recorder** and the **App** host as `net10.0-windows`. LTS support runs to November 2028 [1].
+  **Recorder** and the **App** host as `net10.0-windows`; the public-holiday adapter `Wtt.PublicHolidays`
+  (ADR-007) as a plain `net10.0` library, on the runtime's own HTTP and JSON. LTS support runs to November 2028 [1].
 - **App host: Windows Forms with the WebView2 control.** The window holds one WebView2 and nothing
   else; all screens are web (ADR-006).
 - **Recorder:** a windowless process with a hidden top-level window, never shown, for session and power

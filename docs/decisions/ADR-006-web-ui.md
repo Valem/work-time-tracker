@@ -1,13 +1,13 @@
 # ADR-006: UI — Preact + TypeScript in WebView2, a message bridge, and a locked-down, silent web view
 
 **Status:** proposed · **Decided by:** owner (web UI in WebView2) · agent (library, bridge, lockdown)
-· **Introduced by:** 001-foundation
+· **Introduced by:** 001-foundation · **Amended by:** 002-holiday-planner
 
 ## Context
 
 The owner chose a web UI hosted in WebView2 (ADR-001). 001 needs three screens — week, day timeline,
-lunch settings — and the series adds a day-correction form (002), a balance panel (003) and a year
-planner (004). The app may send nothing over the network (outcome 7), but WebView2 is a Chromium runtime
+lunch settings — and 002 adds a year planner worked by dragging and clicking. The page sends nothing over
+the network — the app's only request is the App host's public-holiday request (ADR-007) — but WebView2 is a Chromium runtime
 with its own background services, and **no documented switch silences them all** [3]; SmartScreen
 checks every navigation unless disabled [1]. Content served through a virtual-host folder mapping
 does not raise `WebResourceRequested`, so request filtering cannot be the guard [2].
@@ -16,7 +16,7 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 
 - **Library:** Preact with TypeScript, bundled by Vite on Node LTS; its type check runs in the verify
   command (ADR-005). The screens follow the 001 concept's descriptions (week, day timeline, settings,
-  recording status). Vite's esbuild and Rollup run as their WebAssembly builds (`esbuild-wasm`,
+  recording status) and 002's (year planner, «Mein Jahr», the week's day marks). Vite's esbuild and Rollup run as their WebAssembly builds (`esbuild-wasm`,
   `@rollup/wasm-node`, npm overrides), because Smart App Control may block their unsigned native binaries
   on a development laptop, while WebAssembly runs inside the signed Node.js.
 - **Serving:** the built assets ship in the install folder and load from a virtual host mapped to
@@ -45,8 +45,10 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 - **Lockdown, all required:**
   - navigation outside the app host is cancelled; new windows are refused;
   - downloads, external protocols, permissions, script dialogs, browser extensions and single sign-on
-    are off; a link or file dropped on the window opens nothing;
-  - a Content-Security-Policy of `'self'` only — no remote scripts, styles, fonts or connections;
+    are off; a link or file dropped on the window opens nothing; the planner's drags are pointer events
+    within the page, never HTML drag and drop;
+  - a Content-Security-Policy of `'self'` only — no remote scripts, styles, fonts or connections; the page
+    never requests the public holidays itself (ADR-007);
   - reputation checking (SmartScreen) off for the app's own pages; autofill and password saving off;
   - the WebView2 user-data folder lives in the app's data folder (ADR-004);
   - in a release build, DevTools, the default context menu and the browser's shortcut keys are off,
@@ -57,15 +59,16 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 - **Runtime:** the Evergreen WebView2 runtime that ships with Windows 11; its updates are Windows'
   own (Edge Update), not the app's.
 - **Proof, not assumption:** the network traffic of the app's whole process tree, WebView2 children
-  included, is measured on real runs (001 concept, Phase-2 probe, Phases 3 and 4). The only connections
-  allowed are the runtime's own update and network-time checks to Microsoft (owner, after the Phase-2
-  probe found them); any other connection is a finding.
+  included, is measured on real runs (001 concept, Phase-2 probe, Phases 3 and 4; 002 concept). The only
+  connections allowed are the runtime's own update and network-time checks to Microsoft (owner, after the
+  Phase-2 probe found them) and the App host's public-holiday request with what Windows fetches to check its
+  certificate and find the proxy (ADR-007, owner); any other connection is a finding.
 
 ## Rejected alternatives
 
 | Option | Why not |
 |--------|---------|
-| No framework (plain TypeScript + DOM, like the prototype) | Fine for three read-only screens; 002's editing and 004's year planner would hand-build state and re-rendering |
+| No framework (plain TypeScript + DOM, like the prototype) | Fine for three read-only screens; 002's year planner would hand-build state and re-rendering |
 | React | Same component model as Preact at ~10× the bundle |
 | Vue, Svelte | Their own template compilers and conventions for no gain here |
 | Lit / web components | Lower-level; more hand-written state for the same screens |
