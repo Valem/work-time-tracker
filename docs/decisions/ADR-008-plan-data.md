@@ -17,9 +17,11 @@ and another public-holiday source.
   - **Bookings:** one per date, the person's intent: whole or half. Only a drag, a click or an undo changes one.
   - **«Mein Jahr» settings:** Pensum, the work share of each weekday Monday–Friday (none, half or whole), the yearly
     holiday days or none (prefilled), the canton — each with the date it applies from, 1 January of the planned year;
-    superseded, never edited. A year without its own settings uses the last earlier one's.
+    superseded, never edited. On a date, the settings with the latest start on or before it apply; of several with one
+    start, the last saved. A year without its own settings so uses the last earlier one's. «Mein Jahr» offers each
+    weekday as working or free; the half share is kept for a later half free day.
   - **Ticks:** the dates whose optional or part-canton public holiday the person marked as granted. Settings saved
-    with another canton clear the ticks from their date on.
+    with another canton clear the ticks on the dates those settings apply to.
   - **Public-holiday years:** per canton and year, the entries in the domain's terms (ADR-007), names in every
     language the source gave, the source and the load time; replaced only whole.
   - **Layout:** the planner's chosen layout.

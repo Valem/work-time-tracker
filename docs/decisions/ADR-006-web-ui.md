@@ -61,8 +61,8 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 - **Proof, not assumption:** the network traffic of the app's whole process tree, WebView2 children
   included, is measured on real runs (001 concept, Phase-2 probe, Phases 3 and 4; 002 concept). The only
   connections allowed are the runtime's own update and network-time checks to Microsoft (owner, after the
-  Phase-2 probe found them) and the App host's public-holiday request with what Windows fetches to check its
-  certificate and find the proxy (ADR-007, owner); any other connection is a finding.
+  Phase-2 probe found them) and the App host's public-holiday request with its DNS lookup and what Windows
+  fetches to find the proxy (ADR-007, owner); any other connection is a finding.
 
 ## Rejected alternatives
 

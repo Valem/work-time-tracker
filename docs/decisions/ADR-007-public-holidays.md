@@ -1,7 +1,8 @@
-# ADR-007: Public holidays — one open source behind a neutral port, requested by the App host only
+# ADR-007: Public holidays — one open source behind a neutral port, requested by the App host
 
 **Status:** proposed · **Decided by:** owner (OpenHolidays as the source; the request names country, canton and
-year; no credentials to any proxy) · agent (where, when, port, limits) · **Introduced by:** 002-holiday-planner
+year; the App host sends it, the developer CLI only when run by hand; no credentials to any proxy; no revocation
+fetch) · agent (when, port, limits) · **Introduced by:** 002-holiday-planner
 
 ## Context
 
@@ -21,24 +22,25 @@ page cannot make it: its Content-Security-Policy is `'self'` (ADR-006). Facts fr
 ## Decision
 
 - **Source:** OpenHolidays, `GET https://openholidaysapi.org/PublicHolidays?countryIsoCode=CH&subdivisionCode=CH-<canton>&validFrom=<year>-01-01&validTo=<year>-12-31`,
-  with `Accept: application/json` and `User-Agent: WorkTimeTracker` (no version, no system details) and no other
-  header, cookie or credential.
+  with `Accept: application/json` and no other header — no `User-Agent`, cookie or credential — so it names only
+  country, canton and year.
 - **Neutral port:** Application declares `IPublicHolidaySource`; it returns a domain `PublicHolidayYear` — per entry the
   date, its share (whole, half), its kind (public, optional, other), its reach (country, canton, part of the canton)
   and its names by language. The adapter translates and judges nothing; the domain decides which days count (002
   BR-014), as the history import records facts without judging them.
 - **Where:** the adapter lives in `Wtt.PublicHolidays`, the only project with network code, referenced by the App and
-  the developer CLI. The App host makes the request; the Recorder never does. The architecture test fails when the
-  Recorder or Infrastructure references `Wtt.PublicHolidays` or uses `System.Net`, with negative probes.
+  the developer CLI. The App host makes the request (owner); the developer CLI's `holidays` command, run by hand,
+  sends the same request; the Recorder never connects. The architecture test fails when the Recorder references
+  `Wtt.PublicHolidays` or any project but it uses `System.Net`, with negative probes.
 - **When:** only while the App runs, once a canton is chosen, for last, this or next year, and only for a canton-year
   not yet stored — at App start for the current year, when the planner or the week shows such a year, after a canton is
-  saved — and once per click on «Feiertage neu laden». After a failure: again at the next App start, or at the next
-  need at least 1 h later.
-- **Transport:** HTTPS with Windows' default certificate validation, revocation included; no redirect; no
-  decompression; at most 256 KiB in at most 15 s. The system proxy is used without the person's credentials — a proxy
+  saved — and once per click on «Feiertage neu laden», none while that canton-year is loading. After a failure: again
+  at the next App start, or at the next need at least 1 h later.
+- **Transport:** HTTPS with the .NET runtime's default certificate check — chain, name and expiry by Windows, no
+  revocation fetch (owner); no redirect; no decompression; at most 256 KiB in at most 15 s. The system proxy is used without the person's credentials — a proxy
   that asks for a sign-in leaves the holidays unloaded, and the planner says so (owner).
-- **Untrusted response:** read strictly for required fields, extra fields ignored; plausibility as 002 NFR-006; taken
-  only whole and valid. Stored in the domain's terms with the source and the load time (ADR-008), never the raw body.
+- **Untrusted response:** read strictly for required fields, extra fields ignored; plausibility as 002 NFR-006 — an
+  entry reaching neither the country nor the requested canton refuses the whole response; taken only whole and valid. Stored in the domain's terms with the source and the load time (ADR-008), never the raw body.
   A failure keeps the stored year and writes its reason, never the body, to the errors-only log.
 - **Offline:** everything works with what is stored; a year not loaded says so, and counts follow once it arrives.
 - **Attribution:** «Mein Jahr» names OpenHolidays and its licence.
@@ -56,7 +58,8 @@ page cannot make it: its Content-Security-Policy is `'self'` (ADR-006). Facts fr
 | Storing the raw response | An untrusted blob at rest, parsed again on every read |
 | `languageIsoCode` in the request | A fourth parameter, and a new request for each language |
 | The person's credentials to an asking proxy | Their Windows sign-in would leave the laptop for a public-holiday list (owner) |
-| Revocation checks off | Weaker TLS to hide the certificate fetches; NFR-001 names them instead |
+| A revocation check | A fetch from the certificate authority beside each request; the runtime default omits it (owner) |
+| A `User-Agent` header | It would name the app in every request; the runtime sends none |
 
 ## Consequences
 
