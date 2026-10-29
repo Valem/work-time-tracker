@@ -48,6 +48,14 @@ public sealed class PrecisionRule
             Assert.False(day.IsRebuilt);
         });
 
+        await rule.CheckAsync("Windows' history logging the sign-in 74 ms before the session's logon time, the Recorder starting 2:21 after it: one sign-in, the day starts at it and is not rebuilt", async () =>
+        {
+            var day = await SignedInAt0810WithHistoryLockAsync(recorderStarts: "2026-10-20 08:12:21", historySignIn: "2026-10-20 08:09:59.926");
+            Assert.Equal(At("2026-10-20 08:10:00"), day.Start);
+            Assert.Contains(day.Pauses, pause => (pause.Start, pause.End) == (At("2026-10-20 08:11:00"), At("2026-10-20 08:12:00")));
+            Assert.False(day.IsRebuilt);
+        });
+
         await rule.CheckAsync("a Recorder starting 5:01 after the sign-in: that stretch's use comes from history outside coverage and the day is rebuilt", async () =>
         {
             var day = await SignedInAt0810WithHistoryLockAsync(recorderStarts: "2026-10-20 08:15:01");
@@ -76,12 +84,15 @@ public sealed class PrecisionRule
         rule.AssertAllHold();
     }
 
-    /// <summary>Signed in at 08:10, locked 08:11–08:12 as only Windows recorded it, the Recorder started then, used until 17:00.</summary>
-    private static async Task<Workday> SignedInAt0810WithHistoryLockAsync(string recorderStarts)
+    /// <summary>
+    /// Signed in at 08:10, which Windows' history logs at <paramref name="historySignIn"/>, locked 08:11–08:12 as only
+    /// Windows recorded it, the Recorder started then, used until 17:00.
+    /// </summary>
+    private static async Task<Workday> SignedInAt0810WithHistoryLockAsync(string recorderStarts, string historySignIn = "2026-10-20 08:10:00")
     {
         using var rig = new RecorderRig("2026-10-20 08:09:00");
         rig.TimePassesUnseen(recorderStarts);
-        rig.WindowsLogs(FactKind.SignIn, "2026-10-20 08:10:00", FactSource.SystemHistory);
+        rig.WindowsLogs(FactKind.SignIn, historySignIn, FactSource.SystemHistory);
         rig.WindowsLogs(FactKind.Lock, "2026-10-20 08:11:00");
         rig.WindowsLogs(FactKind.Unlock, "2026-10-20 08:12:00");
         await rig.StartRecorderAsync("2", signedInAt: "2026-10-20 08:10:00");

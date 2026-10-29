@@ -71,7 +71,7 @@ internal sealed class RecorderRig : IDisposable
     private LiveRecorder Recorder => recorder ?? throw new InvalidOperationException("Start the Recorder first.");
 
     public static DateTimeOffset At(string localTime) =>
-        new(DateTime.ParseExact(localTime, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture), Local);
+        new(DateTime.ParseExact(localTime, ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss.fff"], CultureInfo.InvariantCulture, DateTimeStyles.None), Local);
 
     public void Dispose() => file.Dispose();
 
