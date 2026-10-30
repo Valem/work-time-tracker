@@ -1,6 +1,7 @@
 using Wtt.App.Bridge;
 using Wtt.App.Data;
 using Wtt.App.Recording;
+using Wtt.Domain.Time;
 using Wtt.Infrastructure.Diagnostics;
 using WindowsApplication = System.Windows.Forms.Application;
 
@@ -24,10 +25,33 @@ internal static class Program
         RecorderLauncher.ForThisSession(folders.ProgramFolder, options.DataFolder, log).EnsureRunning();
 
         var clock = TimeProvider.System;
+        using var stopping = new CancellationTokenSource();
         bool RecorderRunning() => RecorderLauncher.IsRunning(folders.Data);
-        var data = Task.Run(() => AppServices.OpenAsync(folders.Data, RecorderRunning, clock));
+        var data = Task.Run(() => AppServices.OpenAsync(folders.Data, RecorderRunning, log, clock, stopping.Token));
+        _ = NeedThisYearAsync(data, clock, log);
         var bridge = new BridgeHost(new BridgeHandlers(data, RecorderRunning, clock), log);
 
         WindowsApplication.Run(new MainForm(folders, log, bridge, data));
+        stopping.Cancel();
+    }
+
+    /// <summary>App start needs this year's public holidays; a data file that failed to open is the window's to show.</summary>
+    private static async Task NeedThisYearAsync(Task<AppServices> data, TimeProvider clock, ErrorLog log)
+    {
+        await ((Task)data).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        if (!data.IsCompletedSuccessfully)
+        {
+            return;
+        }
+
+        try
+        {
+            var today = clock.GetLocalNow().LocalDate();
+            await data.Result.Needs.NeedAsync(today, today);
+        }
+        catch (Exception failure)
+        {
+            log.Write("Asking for this year's public holidays at start", failure);
+        }
     }
 }

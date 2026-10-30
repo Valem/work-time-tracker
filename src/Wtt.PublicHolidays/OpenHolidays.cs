@@ -10,7 +10,8 @@ public static class OpenHolidays
     /// <summary>Far above the 7–20 KB a canton's year takes.</summary>
     public const int MaxAnswerBytes = 256 * 1024;
 
-    public static readonly HolidaySource Source = new("OpenHolidays", "ODbL 1.0");
+    /// <summary>Named as its attribution asks: the source with its address, and the licence of its data.</summary>
+    public static readonly HolidaySource Source = new("OpenHolidays (openholidaysapi.org)", "ODbL 1.0");
 
     public static readonly TimeSpan AnswerWithin = TimeSpan.FromSeconds(15);
 

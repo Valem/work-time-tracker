@@ -20,7 +20,7 @@ internal static class PlanPrinter
     {
         output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
-            $"Public holidays of CH-{year.Canton} {year.Year} from {year.Source.Name} ({year.Source.Licence}), loaded {year.LoadedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC: {year.Entries.Count} days"));
+            $"Public holidays of CH-{year.Canton} {year.Year} from {year.Source.Name}, {year.Source.Licence}, loaded {year.LoadedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC: {year.Entries.Count} days"));
         output.WriteLine(Row(HolidayRow, "Day", "Share", "Counts", "Kind", "Reach", "Name"));
         foreach (var entry in year.Entries)
         {
@@ -103,7 +103,7 @@ internal static class PlanPrinter
         {
             LoadStatus.NoCanton => "no canton chosen",
             LoadStatus.Loading => $"{what}loading",
-            LoadStatus.Loaded => string.Create(CultureInfo.InvariantCulture, $"{what}loaded {load.LoadedAt!.Value.ToUniversalTime():yyyy-MM-dd HH:mm} UTC from {settings.Source.Name} ({settings.Source.Licence})"),
+            LoadStatus.Loaded => string.Create(CultureInfo.InvariantCulture, $"{what}loaded {load.LoadedAt!.Value.ToUniversalTime():yyyy-MM-dd HH:mm} UTC from {settings.Source.Name}, {settings.Source.Licence}"),
             LoadStatus.OutOfRange => $"{what}not loaded, outside last, this and next year; counts may change",
             _ => $"{what}not loaded{(load.Reason is { } reason ? $" ({Code(reason)})" : string.Empty)}; counts may change",
         };

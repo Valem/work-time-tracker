@@ -8,13 +8,14 @@ namespace Wtt.App.Bridge;
 /// <summary>What the domain derived, as the bridge carries it: every number is the domain's, only re-expressed in minutes.</summary>
 internal static class Views
 {
-    public static DayRow Row(Workday day) => new(
+    public static DayRow Row(Workday day, IReadOnlyList<DayMark> marks) => new(
         Day(day.Date),
         day.Start is { } start ? MinutesOn(start, day.Date) : null,
         day.End is { } end ? MinutesOn(end, day.Date) : null,
         Minutes(day.Break),
         Minutes(day.Total),
-        day.IsRebuilt);
+        day.IsRebuilt,
+        marks);
 
     public static DayView Of(Workday day) => new(
         Day(day.Date),

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Wtt.App.Web;
+using Wtt.Application.Planning;
 using Wtt.Infrastructure.Diagnostics;
 using Wtt.Infrastructure.Storage;
 
@@ -47,7 +48,7 @@ internal sealed class BridgeHost(BridgeHandlers handlers, ErrorLog log)
             var code = CodeFor(failure);
             log.Write(
                 $"Bridge: refused {request?.Type ?? "an unreadable message"} (id {request?.Id.ToString(CultureInfo.InvariantCulture) ?? "none"}) with {code}",
-                failure is BridgeRefusalException { InnerException: null } ? null : failure);
+                failure is BridgeRefusalException { InnerException: null } or PlanRefusedException ? null : failure);
             var refusal = new BridgeRefusal(request?.Id, new Refusal(code));
             return new BridgeReply(JsonSerializer.Serialize(refusal, BridgeContract.Json), code == RefusalCode.DataFileUnreadable);
         }
@@ -81,6 +82,15 @@ internal sealed class BridgeHost(BridgeHandlers handlers, ErrorLog log)
     private static RefusalCode CodeFor(Exception failure) => failure switch
     {
         BridgeRefusalException refusal => refusal.Code,
+        PlanRefusedException refused => refused.Refusal switch
+        {
+            PlanRefusal.YearOutOfRange => RefusalCode.YearOutOfRange,
+            PlanRefusal.DateNotInYear => RefusalCode.DateNotInYear,
+            PlanRefusal.NotOptionalHoliday => RefusalCode.NotOptionalHoliday,
+            PlanRefusal.NoCanton => RefusalCode.NoCanton,
+            PlanRefusal.ValueOutOfRange => RefusalCode.ValueOutOfRange,
+            _ => RefusalCode.Failed,
+        },
         DataFileException or SqliteException or InvalidDataException or IOException or UnauthorizedAccessException => RefusalCode.DataFileUnreadable,
         _ => RefusalCode.Failed,
     };

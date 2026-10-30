@@ -7,24 +7,30 @@ using static Wtt.App.Bridge.BridgeValues;
 namespace Wtt.App.Bridge;
 
 /// <summary>
-/// Answers each message type from the application's queries; <see cref="BridgeContract"/> binds each handler to its
-/// message. The host supplies the navigation and the calendar — the current week, previous and next Mondays, ISO
-/// weeks — so the UI never steps a date or reads a clock.
+/// Answers each message type from the application's queries and the holiday planner; <see cref="BridgeContract"/> binds
+/// each handler to its message. The host supplies the navigation and the calendar — the current week, previous and next
+/// Mondays, ISO weeks, the planner's months and days — so the UI never steps a date or reads a clock.
 /// </summary>
 internal sealed class BridgeHandlers(Task<AppServices> services, Func<bool> recorderRunning, TimeProvider clock)
 {
+    public PlannerHandlers Planner { get; } = new(services, clock);
+
+    /// <summary>The week's days with their times and, beside them, the marks of what counts on each; showing it needs its public holidays.</summary>
     public async Task<WeekView> WeekAsync(WeekRequest request)
     {
         var current = WorkWeek.MondayOf(Today());
         var monday = request.Monday is null ? current : Monday(request.Monday);
+        var sunday = monday.AddDays(6);
         var app = await services;
+        await app.Needs.NeedAsync(monday, sunday);
         var week = await app.Queries.GetWeekAsync(monday);
+        var marks = (await app.Planner.StatusesAsync(monday, sunday)).ToDictionary(status => status.Date, PlanViews.Marks);
         var oldest = await app.Journal.EarliestAsync() is { } earliest ? WorkWeek.MondayOf(earliest.LocalDate()) : current;
         return new WeekView(
             WeekOf(monday),
             monday > oldest ? Day(monday.AddDays(-7)) : null,
             monday < current ? Day(monday.AddDays(7)) : null,
-            week.Days.Select(Views.Row).ToList(),
+            week.Days.Select(day => Views.Row(day, marks.GetValueOrDefault(day.Date) ?? [])).ToList(),
             Minutes(week.Total));
     }
 

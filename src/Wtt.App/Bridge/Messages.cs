@@ -18,8 +18,21 @@ public sealed record WeekRequest(string? Monday = null);
 /// <summary>A week from Monday to Sunday; previous and next are null at the oldest kept fact's week and at the current week.</summary>
 public sealed record WeekView(IsoWeek Week, CalendarDay? Previous, CalendarDay? Next, IReadOnlyList<DayRow> Days, int Total);
 
-/// <summary>One day of the week; start and end are null on a day without use.</summary>
-public sealed record DayRow(CalendarDay Day, int? Start, int? End, int Break, int Total, bool Rebuilt);
+/// <summary>One day of the week; start and end are null on a day without use. Its marks say what counts on it beside its times.</summary>
+public sealed record DayRow(CalendarDay Day, int? Start, int? End, int Break, int Total, bool Rebuilt, IReadOnlyList<DayMark> Marks);
+
+/// <summary>What counts on a day: a holiday or half a one booked, a public holiday or half a one, or a free day.</summary>
+public enum MarkKind
+{
+    Holiday,
+    HalfHoliday,
+    PublicHoliday,
+    HalfPublicHoliday,
+    FreeDay,
+}
+
+/// <summary>A mark of a day; a public holiday's carries the names of those that count, in the app's language.</summary>
+public sealed record DayMark(MarkKind Kind, IReadOnlyList<string> Names);
 
 public sealed record DayRequest(string Date);
 

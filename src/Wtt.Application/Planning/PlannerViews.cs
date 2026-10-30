@@ -4,8 +4,8 @@ using Wtt.Domain.Planning;
 
 namespace Wtt.Application.Planning;
 
-/// <summary>A date of the year as the planner shows it.</summary>
-public sealed record DayPlan(DayStatus Status, bool Past, bool Today);
+/// <summary>A date of the year as the planner shows it, with what a click on it would change.</summary>
+public sealed record DayPlan(DayStatus Status, bool Past, bool Today, EditKind OnClick);
 
 public sealed record MonthPlan(int Month, IReadOnlyList<DayPlan> Days);
 

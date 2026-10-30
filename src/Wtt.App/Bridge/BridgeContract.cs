@@ -19,7 +19,10 @@ public enum RefusalCode
     WindowNotAfterStart,
     TooManyTiers,
 
-    /// <summary>A time or duration below 0:00 or over 24:00; a lunch window ends by 23:59.</summary>
+    /// <summary>
+    /// A time or duration below 0:00 or over 24:00, a lunch window ending after 23:59; a Pensum outside 1–100, yearly days
+    /// outside 0–366, or a restore of more than 366 days or of one day twice.
+    /// </summary>
     ValueOutOfRange,
     NotWholeMinutes,
     DuplicateThreshold,
@@ -28,6 +31,18 @@ public enum RefusalCode
     InvalidRule,
     DataFileUnreadable,
     Failed,
+
+    /// <summary>A year outside the planner's switch, or a reload outside last, this and next year.</summary>
+    YearOutOfRange,
+
+    /// <summary>A date a planner gesture names is not in the year it names.</summary>
+    DateNotInYear,
+
+    /// <summary>A tick on a date without an entry of that share that does not count by itself.</summary>
+    NotOptionalHoliday,
+
+    /// <summary>A reload while no canton is chosen for the year.</summary>
+    NoCanton,
 }
 
 /// <summary>What the UI sends: an id it chose, one of the message types and that type's payload.</summary>
@@ -64,6 +79,16 @@ public static class BridgeContract
         BridgeRoute.For<StatusRequest, StatusView>("status.get", handlers => handlers.StatusAsync),
         BridgeRoute.For<LunchRuleRequest, LunchRuleView>("lunchRule.get", handlers => handlers.LunchRuleAsync),
         BridgeRoute.For<LunchRuleInput, LunchRuleView>("lunchRule.save", handlers => handlers.SaveLunchRuleAsync),
+        BridgeRoute.For<YearRequest, YearView>("planner.year.get", handlers => handlers.Planner.YearAsync),
+        BridgeRoute.For<DragRequest, PreviewView>("planner.preview", handlers => handlers.Planner.PreviewAsync),
+        BridgeRoute.For<DragRequest, EditView>("planner.drag", handlers => handlers.Planner.DragAsync),
+        BridgeRoute.For<ClickRequest, EditView>("planner.click", handlers => handlers.Planner.ClickAsync),
+        BridgeRoute.For<TickRequest, EditView>("planner.tick", handlers => handlers.Planner.TickAsync),
+        BridgeRoute.For<RestoreRequest, YearView>("planner.restore", handlers => handlers.Planner.RestoreAsync),
+        BridgeRoute.For<PlannerSettingsRequest, PlannerSettingsView>("planner.settings.get", handlers => handlers.Planner.SettingsAsync),
+        BridgeRoute.For<PlannerSettingsInput, PlannerSettingsView>("planner.settings.save", handlers => handlers.Planner.SaveSettingsAsync),
+        BridgeRoute.For<ReloadRequest, HolidayLoadView>("planner.reload", handlers => handlers.Planner.ReloadAsync),
+        BridgeRoute.For<LayoutInput, LayoutView>("planner.layout.save", handlers => handlers.Planner.SaveLayoutAsync),
     ]);
 
     public static IReadOnlyList<BridgeMessage> Messages { get; } = Routes.Select(route => route.Message).ToList();

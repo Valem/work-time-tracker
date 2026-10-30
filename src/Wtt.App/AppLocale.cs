@@ -13,6 +13,9 @@ internal static class AppLocale
 
     public static CultureInfo Culture { get; } = CultureInfo.GetCultureInfo(Name);
 
+    /// <summary>The language public-holiday names are shown in, as the source keys them: two letters, upper case.</summary>
+    public static string HolidayLanguage { get; } = Culture.TwoLetterISOLanguageName.ToUpperInvariant();
+
     public static void ApplyToHost()
     {
         CultureInfo.DefaultThreadCurrentUICulture = Culture;

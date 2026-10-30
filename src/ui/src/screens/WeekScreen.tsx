@@ -1,6 +1,6 @@
-import type { DayRow } from '../bridge/contract';
+import type { DayMark, DayRow } from '../bridge/contract';
 import { useAnswer } from '../bridge/useAnswer';
-import { useWords } from '../locale/context';
+import { useWords, type Words } from '../locale/context';
 import { Pending } from './Notice';
 
 interface WeekScreenProps {
@@ -11,7 +11,10 @@ interface WeekScreenProps {
   readonly onOpenDay: (date: string) => void;
 }
 
-/** Monday to Sunday with start, end, break, total and the rebuilt mark, the week total, and the way to the weeks around it. */
+/**
+ * Monday to Sunday with start, end, break, total, the rebuilt mark and the marks of what counts on each day, the week
+ * total, and the way to the weeks around it.
+ */
 export function WeekScreen({ monday, tick, onShowWeek, onOpenDay }: WeekScreenProps) {
   const words = useWords();
   const { language, formats } = words;
@@ -78,6 +81,11 @@ function WeekRow({ row, onOpen }: { row: DayRow; onOpen: () => void }) {
       <span class="cell pause">{used ? language.week.pause(formats.duration(row.break)) : language.empty}</span>
       <span class="cell total">{formats.duration(row.total)}</span>
       <span class="cell mark">
+        {row.marks.map((mark) => (
+          <span key={mark.kind} class="day-mark" data-kind={mark.kind}>
+            {markText(mark, words)}
+          </span>
+        ))}
         {row.rebuilt && (
           <span class="rebuilt" title={language.week.rebuiltHint}>
             {language.week.rebuilt}
@@ -86,4 +94,20 @@ function WeekRow({ row, onOpen }: { row: DayRow; onOpen: () => void }) {
       </span>
     </button>
   );
+}
+
+function markText(mark: DayMark, words: Words): string {
+  const { marks } = words.language;
+  switch (mark.kind) {
+    case 'holiday':
+      return marks.holiday;
+    case 'halfHoliday':
+      return marks.halfHoliday;
+    case 'publicHoliday':
+      return marks.publicHoliday(mark.names);
+    case 'halfPublicHoliday':
+      return marks.halfPublicHoliday(mark.names);
+    case 'freeDay':
+      return marks.freeDay;
+  }
 }

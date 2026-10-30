@@ -12,8 +12,9 @@ internal static class BridgeValues
     private const int FirstYear = 2000;
     private const int LastYear = 2099;
 
-    public static CalendarDay Day(DateOnly date) =>
-        new(date.ToString(DateFormat, CultureInfo.InvariantCulture), IsoWeekday(date));
+    public static CalendarDay Day(DateOnly date) => new(Text(date), IsoWeekday(date));
+
+    public static string Text(DateOnly date) => date.ToString(DateFormat, CultureInfo.InvariantCulture);
 
     public static IsoWeek WeekOf(DateOnly date) => new(ISOWeek.GetYear(Midnight(date)), ISOWeek.GetWeekOfYear(Midnight(date)));
 
@@ -50,6 +51,10 @@ internal static class BridgeValues
         var date = Date(text);
         return date.DayOfWeek == DayOfWeek.Monday ? date : throw new BridgeRefusalException(RefusalCode.NotMonday);
     }
+
+    /// <exception cref="BridgeRefusalException">A year outside 2000–2099, where no planner year lies.</exception>
+    public static int Year(int year) =>
+        year is < FirstYear or > LastYear ? throw new BridgeRefusalException(RefusalCode.YearOutOfRange) : year;
 
     private static int IsoWeekday(DateOnly date) => date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;
 

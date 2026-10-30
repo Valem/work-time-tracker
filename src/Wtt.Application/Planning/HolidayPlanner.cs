@@ -262,7 +262,7 @@ public sealed class HolidayPlanner(
             var days = new List<DayPlan>();
             for (var date = new DateOnly(view.Year, month, 1); date.Month == month; date = date.AddDays(1))
             {
-                days.Add(new DayPlan(rules.StatusOn(date, facts), Past: date < view.Today, Today: date == view.Today));
+                days.Add(new DayPlan(rules.StatusOn(date, facts), Past: date < view.Today, Today: date == view.Today, OnClick: KindOf(rules.Click(facts, date))));
             }
 
             months.Add(new MonthPlan(month, days));
