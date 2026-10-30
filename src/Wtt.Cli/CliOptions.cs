@@ -10,11 +10,21 @@ internal enum CliCommand
     Weeks,
     StartTest,
     ImportXml,
+    Holidays,
+    ImportHolidays,
+    Plan,
 }
 
 /// <param name="EventFile">import-xml: the file of Windows event XML to import.</param>
 /// <param name="User">import-xml: the account whose sessions count.</param>
-internal sealed partial record CliOptions(CliCommand Command, string? DatabasePath, bool Import, string? EventFile = null, UserSid? User = null)
+/// <param name="Planning">holidays, import-holidays and plan: what they ask for.</param>
+internal sealed partial record CliOptions(
+    CliCommand Command,
+    string? DatabasePath,
+    bool Import,
+    string? EventFile = null,
+    UserSid? User = null,
+    PlanningOptions? Planning = null)
 {
     public static bool TryParse(string[] args, [NotNullWhen(true)] out CliOptions? options, out string error)
     {
@@ -31,6 +41,9 @@ internal sealed partial record CliOptions(CliCommand Command, string? DatabasePa
             "weeks" => CliCommand.Weeks,
             "start-test" => CliCommand.StartTest,
             "import-xml" => CliCommand.ImportXml,
+            "holidays" => CliCommand.Holidays,
+            "import-holidays" => CliCommand.ImportHolidays,
+            "plan" => CliCommand.Plan,
             "help" or "--help" or "-h" or "/?" => CliCommand.Help,
             _ => null,
         };
@@ -40,6 +53,24 @@ internal sealed partial record CliOptions(CliCommand Command, string? DatabasePa
             return false;
         }
 
+        if (command is CliCommand.Holidays or CliCommand.ImportHolidays or CliCommand.Plan)
+        {
+            if (!PlanningOptions.TryParse(command.Value, args[1..], out var planning, out var databasePath, out error))
+            {
+                return false;
+            }
+
+            options = new CliOptions(command.Value, databasePath, Import: false, Planning: planning);
+            return true;
+        }
+
+        return TryParseHistoryCommand(command.Value, args, out options, out error);
+    }
+
+    private static bool TryParseHistoryCommand(CliCommand command, string[] args, [NotNullWhen(true)] out CliOptions? options, out string error)
+    {
+        options = null;
+        error = string.Empty;
         var importsXml = command == CliCommand.ImportXml;
         string? databasePath = null;
         string? eventFile = null;
@@ -78,7 +109,7 @@ internal sealed partial record CliOptions(CliCommand Command, string? DatabasePa
             return false;
         }
 
-        options = new CliOptions(command.Value, databasePath, import, eventFile, user is null ? null : new UserSid(user));
+        options = new CliOptions(command, databasePath, import, eventFile, user is null ? null : new UserSid(user));
         return true;
     }
 

@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Wtt.Infrastructure\Wtt.Infrastructure.csproj" />
+    <ProjectReference Include="..\Wtt.PublicHolidays\Wtt.PublicHolidays.csproj" />
   </ItemGroup>
 
 </Project>

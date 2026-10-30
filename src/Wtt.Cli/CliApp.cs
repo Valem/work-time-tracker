@@ -15,21 +15,49 @@ internal static class CliApp
     public const string Usage = """
         Usage: wtt-cli <command> [--db <file>] [--no-import]
                wtt-cli import-xml <events.xml> --db <file> --user <sid>
+               wtt-cli holidays --canton <code> --year <year> [--dry-run] [--db <file>]
+               wtt-cli import-holidays <answer.json> --canton <code> --year <year> --db <file>
+               wtt-cli plan --db <file> --year <year> [--today <date>]
+                            [--pensum <percent> [--free <days>] [--yearly-days <days>] [--canton <code>]]
+                            [--drag <from>..<to>] [--click <date>] [--tick <date>] [--untick <date>] [--undo]
+                            [--days <from>..<to>]
 
         Commands:
-          weeks        Every week from the oldest event Windows keeps to today:
-                       each day's start, end, break and total, rebuilt days marked, and the week total.
-          start-test   Where both Windows logs reach back: the start the 2-minute test finds
-                       against the unlock-based start, per workday, and the share within 5 minutes.
-          import-xml   Imports a file of Windows event XML (as EventRecord.ToXml renders each record)
-                       through the same history import as the Windows logs, into the data file --db names.
-                       Read it afterwards with: weeks --db <file> --no-import
+          weeks            Every week from the oldest event Windows keeps to today:
+                           each day's start, end, break and total, rebuilt days marked, and the week total.
+          start-test       Where both Windows logs reach back: the start the 2-minute test finds
+                           against the unlock-based start, per workday, and the share within 5 minutes.
+          import-xml       Imports a file of Windows event XML (as EventRecord.ToXml renders each record)
+                           through the same history import as the Windows logs, into the data file --db names.
+                           Read it afterwards with: weeks --db <file> --no-import
+          holidays         Sends the one public-holiday request to OpenHolidays — country, canton and year —
+                           and prints every day with its share and whether it counts by itself or is offered.
+                           With --db it stores the year there; with --dry-run it prints the request instead.
+          import-holidays  Reads a saved OpenHolidays answer through the same checks as the live one and
+                           stores it for the canton and year, or refuses it whole and logs the reason
+                           in errors.log beside the data file.
+          plan             Saves Mein Jahr for the year (with --pensum), applies the gestures in the order
+                           given as the app does, then prints Mein Jahr, the counts and the year's booked,
+                           public-holiday and bridge days. Never sends a request.
 
         Options:
-          --db <file>   The data file to use (default: %LocalAppData%\WorkTimeTracker\wtt-cli.db).
-                        import-xml needs it and never writes into %LocalAppData%\WorkTimeTracker.
-          --no-import   Do not read Windows history first; use what the data file holds.
-          --user <sid>  import-xml: the account whose sessions count, such as a fixture's synthetic SID.
+          --db <file>            The data file to use (default: %LocalAppData%\WorkTimeTracker\wtt-cli.db).
+                                 import-xml, import-holidays and plan need it; they and holidays never write
+                                 into %LocalAppData%\WorkTimeTracker.
+          --no-import            Do not read Windows history first; use what the data file holds.
+          --user <sid>           import-xml: the account whose sessions count, such as a fixture's synthetic SID.
+          --canton <code>        The canton, such as ZH; plan: the canton Mein Jahr saves.
+          --year <year>          The year asked for or planned.
+          --dry-run              holidays: print the request exactly as it would be sent, and send nothing.
+          --today <date>         plan: the date taken as today, such as 2027-06-15 (default: today).
+          --pensum <percent>     plan: save Mein Jahr for the year with this Pensum, 1 to 100.
+          --free <days>          plan: the free weekdays, such as Fri or Mon,Wed (default: none).
+          --yearly-days <days>   plan: the yearly holiday days, such as 25 or 16.5 (default: prefilled).
+          --drag <from>..<to>    plan: drag from the first date (the anchor) to the second.
+          --click <date>         plan: click a date.
+          --tick / --untick <date>  plan: tick or untick the date's offered public holiday.
+          --undo                 plan: undo the gesture before it.
+          --days <from>..<to>    plan: list every date from–to instead.
         """;
 
     public static async Task<int> RunAsync(string[] args, TextWriter output, CliEnvironment environment)
@@ -48,15 +76,23 @@ internal static class CliApp
             return 0;
         }
 
+        var planning = options.Command is CliCommand.Holidays or CliCommand.ImportHolidays or CliCommand.Plan;
         var databasePath = Path.GetFullPath(options.DatabasePath ?? environment.DefaultDatabasePath);
-        if (options.Command == CliCommand.ImportXml && MayReachDataFolder(databasePath))
+        if ((options.Command == CliCommand.ImportXml || (planning && options.DatabasePath is not null)) && MayReachDataFolder(databasePath))
         {
-            await output.WriteLineAsync($"import-xml never writes into '{SqliteDatabase.DefaultDirectory}': imported facts must not mix with real use. Name a data file elsewhere.");
+            await output.WriteLineAsync(options.Command == CliCommand.ImportXml
+                ? $"import-xml never writes into '{SqliteDatabase.DefaultDirectory}': imported facts must not mix with real use. Name a data file elsewhere."
+                : $"{args[0]} never uses a data file in '{SqliteDatabase.DefaultDirectory}': plans and public holidays tried here must not mix with real use. Name a data file elsewhere.");
             return 2;
         }
 
         try
         {
+            if (planning)
+            {
+                return await PlanningCommands.RunAsync(options, options.DatabasePath is null ? null : databasePath, output, environment);
+            }
+
             await RunCommandAsync(options, databasePath, output, environment);
             return 0;
         }

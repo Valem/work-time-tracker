@@ -1,4 +1,14 @@
+using System.Text;
 using Wtt.Cli;
+
+try
+{
+    Console.OutputEncoding = Encoding.UTF8;
+}
+catch (IOException)
+{
+    // No console to set it on: the output goes where it was sent, in its own encoding.
+}
 
 try
 {
