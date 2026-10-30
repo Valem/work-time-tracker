@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Wtt.Infrastructure/Wtt.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/Wtt.PublicHolidays/Wtt.PublicHolidays.csproj" />
   </ItemGroup>
 
   <ItemGroup>

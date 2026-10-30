@@ -1,7 +1,8 @@
 #Requires -Version 7
 # The project's one verify command, run locally and by CI:  pwsh tools/verify.ps1
 # .NET build (warnings as errors; the App's build also restores and bundles src/ui, and Wtt.BridgeTypes writes the
-# bridge declarations from C#) -> .NET tests -> the UI type check against those declarations -> hygiene.
+# bridge declarations from C#) -> .NET tests (21: one per business rule BR-001…BR-020, and the architecture test, which
+# reads every project's build output) -> the UI type check against those declarations -> hygiene.
 # Needs the .NET SDK and Node.js (the version in src/ui/.nvmrc). Exits non-zero on the first failing step.
 
 $ErrorActionPreference = 'Stop'
