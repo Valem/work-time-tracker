@@ -1,8 +1,8 @@
 namespace Wtt.Domain.Planning;
 
 /// <summary>
-/// What a date is: the weekend; else a public holiday that counts — also on a free weekday; else a free weekday; else a
-/// workday.
+/// What a date is: a public holiday that counts — also on a weekend or a free weekday; else the weekend; else a free
+/// weekday; else a workday.
 /// </summary>
 public enum DayKind
 {

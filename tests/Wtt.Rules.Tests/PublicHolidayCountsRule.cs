@@ -1,5 +1,5 @@
 using Wtt.Domain.Planning;
-using Wtt.PublicHolidays;
+using Wtt.Rules.Tests.Support;
 using static Wtt.Rules.Tests.Support.Plans;
 
 namespace Wtt.Rules.Tests;
@@ -25,23 +25,11 @@ public sealed class PublicHolidayCountsRule
         ]
         """;
 
-    /// <summary>Solothurn's shape on Friday 01.05.2026: a half day for most districts and a whole day for one place, both part-canton.</summary>
-    private const string Solothurn2026 = """
-        [
-          {"id":"1","startDate":"2026-01-01","endDate":"2026-01-01","type":"Public","name":[{"language":"DE","text":"Neujahrstag"}],
-           "temporalScope":"FullDay","nationwide":true},
-          {"id":"2","startDate":"2026-05-01","endDate":"2026-05-01","type":"Public","name":[{"language":"DE","text":"Tag der Arbeit"}],
-           "temporalScope":"HalfDay","nationwide":false,"subdivisions":[{"code":"CH-SO-BE"},{"code":"CH-SO-LE"}]},
-          {"id":"3","startDate":"2026-05-01","endDate":"2026-05-01","type":"Public","name":[{"language":"DE","text":"Tag der Arbeit"}],
-           "temporalScope":"FullDay","nationwide":false,"subdivisions":[{"code":"CH-SO-TH-AD"}]}
-        ]
-        """;
-
     [Fact]
     public async Task BR_014_public_holiday_that_counts()
     {
         var rule = new RuleScenarios();
-        var aargau = await ReadAnswerAsync(Aargau2027, Canton.AG, 2027);
+        var aargau = await HolidayAnswers.ReadAsync(Aargau2027, Canton.AG, 2027);
         var plan = new PlanScenario(Settings(2027, canton: Canton.AG)).Loaded(aargau, Zurich2027);
 
         rule.Check("a public holiday reaching the whole country counts by itself", () =>
@@ -71,7 +59,7 @@ public sealed class PublicHolidayCountsRule
             Assert.Equal((true, true), Counts(plan, "2027-11-11"));
         });
 
-        var solothurn = await ReadAnswerAsync(Solothurn2026, Canton.SO, 2026);
+        var solothurn = await HolidayAnswers.ReadAsync(HolidayAnswers.Solothurn2026, Canton.SO, 2026);
 
         rule.Check("a tick belongs to one entry: of a half and a whole part-canton holiday on Friday 01.05, each counts once its own tick is set", () =>
         {
@@ -107,21 +95,4 @@ public sealed class PublicHolidayCountsRule
     /// <summary>Whether a public holiday counts on the date, and whether one is offered there to tick.</summary>
     private static (bool Counts, bool Offered) Counts(PlanScenario plan, string date) =>
         plan.Status(date).Holiday is { } holiday ? (holiday.Counts, holiday.Offered) : (false, false);
-
-    /// <summary>Reads the answer through the OpenHolidays translation, as a saved answer replayed by wtt-cli import-holidays.</summary>
-    private static async Task<PublicHolidayYear> ReadAnswerAsync(string answer, Canton canton, int year)
-    {
-        var folder = Path.Combine(Path.GetTempPath(), "wtt-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(folder);
-        try
-        {
-            var path = Path.Combine(folder, "answer.json");
-            await File.WriteAllTextAsync(path, answer);
-            return await new PublicHolidayFile(path, TimeProvider.System).ReadAsync(canton, year, CancellationToken.None);
-        }
-        finally
-        {
-            Directory.Delete(folder, recursive: true);
-        }
-    }
 }

@@ -1,4 +1,5 @@
 using Wtt.Domain.Planning;
+using Wtt.Rules.Tests.Support;
 using static Wtt.Rules.Tests.Support.Plans;
 
 namespace Wtt.Rules.Tests;
@@ -6,10 +7,11 @@ namespace Wtt.Rules.Tests;
 public sealed class WorkShareRule
 {
     [Fact]
-    public void BR_015_work_share()
+    public async Task BR_015_work_share()
     {
         var rule = new RuleScenarios();
         var plan = new PlanScenario(Settings(2027, pensum: 80, free: "Fri", half: "Wed", canton: Canton.ZH)).Loaded(Zurich2027);
+        var solothurn = await HolidayAnswers.ReadAsync(HolidayAnswers.Solothurn2026, Canton.SO, 2026);
 
         rule.Check("a date's share is its weekday's share in the settings in force, none on Saturday and Sunday", () => Assert.Equal(
             [WorkShare.Whole, WorkShare.Whole, WorkShare.Half, WorkShare.Whole, WorkShare.None, WorkShare.None, WorkShare.None],
@@ -46,6 +48,24 @@ public sealed class WorkShareRule
                 (DayKind.PublicHoliday, WorkShare.None, WorkShare.Whole, "Karfreitag"),
                 (karfreitag.Kind, karfreitag.Share, karfreitag.PublicHolidayShare, karfreitag.CountingHolidays.Single().NameIn("DE")));
             Assert.Equal((DayKind.FreeDay, WorkShare.None), (plan.Status("2027-04-02").Kind, plan.Status("2027-04-02").PublicHolidayShare));
+        });
+
+        rule.Check("a weekend with a public holiday that counts is that public holiday, its share none and nothing to book", () =>
+        {
+            var tagDerArbeit = plan.Status("2027-05-01");
+            Assert.Equal(
+                (DayKind.PublicHoliday, WorkShare.None, WorkShare.Whole, "Tag der Arbeit", false),
+                (tagDerArbeit.Kind, tagDerArbeit.Share, tagDerArbeit.PublicHolidayShare, tagDerArbeit.CountingHolidays.Single().NameIn("DE"), tagDerArbeit.Bookable));
+            Assert.Equal((DayKind.Weekend, WorkShare.None), (plan.Status("2027-05-02").Kind, plan.Status("2027-05-02").Share));
+        });
+
+        rule.Check("of several public holidays that count on one date, the largest share is taken: SO 01.05.2026 with its half and its whole entry ticked leaves none", () =>
+        {
+            var both = new PlanScenario(Settings(2026, canton: Canton.SO)).Loaded(solothurn);
+            both.Tick("2026-05-01", share: DayPart.Half);
+            both.Tick("2026-05-01", share: DayPart.Whole);
+            var tagDerArbeit = both.Status("2026-05-01");
+            Assert.Equal((WorkShare.Whole, WorkShare.None), (tagDerArbeit.PublicHolidayShare, tagDerArbeit.Share));
         });
 
         rule.Check("the share a public holiday that counts takes shows on the day: ticked, Sechseläuten is a half public holiday", () =>

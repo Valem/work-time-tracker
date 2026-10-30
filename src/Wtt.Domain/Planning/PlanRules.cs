@@ -160,8 +160,8 @@ public sealed class PlanRules : IPlanRules
         public bool OffForPublicHoliday => Weekday != WorkShare.None && Share == WorkShare.None;
 
         public DayKind Kind =>
-            Date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? DayKind.Weekend
-            : TakenByHoliday != WorkShare.None ? DayKind.PublicHoliday
+            TakenByHoliday != WorkShare.None ? DayKind.PublicHoliday
+            : Date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? DayKind.Weekend
             : Weekday == WorkShare.None ? DayKind.FreeDay
             : DayKind.Workday;
     }

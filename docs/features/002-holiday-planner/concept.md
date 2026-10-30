@@ -112,8 +112,8 @@ classDiagram
 ```
 
 Value types: `WorkShare` = none, half, whole · `DayPart` = whole, half · `HalfDays` = whole half days (33 = 16.5 days) · `Canton` = the 26 cantons · `PublicHolidayEntry` =
-date, share, kind (public, optional, other), reach (country, canton, part of the canton), names by language · `HolidayTick` = date and share of the entry ticked · `DayKind` = weekend,
-else public holiday where one counts (a free weekday too), else free day, else workday; `publicHolidayShare` = the largest share of those that count · `PlanChange` = the bookings and ticks a gesture changes, before and after; its inverse is the undo request.\
+date, share, kind (public, optional, other), reach (country, canton, part of the canton), names by language · `HolidayTick` = date and share of the entry ticked · `DayKind` = public holiday
+where one counts (a weekend or free weekday too), else weekend, else free day, else workday; `publicHolidayShare` = the largest share of those that count · `PlanChange` = the bookings and ticks a gesture changes, before and after; its inverse is the undo request.\
 **Invariants:** a booking is the person's intent and changes only by a drag, a click or an undo; settings are superseded, never edited; a public-holiday
 year holds only dates of its year, at most 100 entries and at least one public holiday reaching the country or the canton. `DayStatus` and `YearLedger`
 are pure functions of settings, public-holiday years, plan and today's date. `Workday` and `WorkWeek` are untouched: a day's marks never change its times.
