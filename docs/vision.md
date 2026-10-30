@@ -1,6 +1,6 @@
 # Work Time Tracker — Vision
 
-**Version:** v1.4.0 — approved 2026-10-29
+**Version:** v1.4.1 — approved 2026-10-30
 
 ## Problem
 Keeping track of working hours by hand is effort that is easily forgotten, while the     [you]
@@ -33,10 +33,12 @@ overview and for typing them into the employer's timesheet.
   buttons and daily confirmations.
 - **Data never leaves the laptop** — no cloud, no account, nothing about the person's    [you]
   hours or holidays sent anywhere. Rules out sync between devices and any online service
-  that receives them. Once a year the app fetches the public holidays of the person's
-  canton from an open source; the request names only the country, canton and year. The
-  browser engine that shows the screens may make its own update and time checks to
-  Microsoft; they carry no data.
+  that receives them. The app fetches the public holidays of the person's canton from an
+  open source: once per canton and year for last, this and next year, once per click to
+  reload them, and after a failure once more at the next start or at a need an hour
+  later; each request names only the country, canton and year. The browser engine that
+  shows the screens may make its own update and time checks to Microsoft; they carry no
+  data.
 - **Free, no running cost** — no subscription, server or paid certificate. Rules out    [you]
   paid code signing; Windows may warn on first install.
 

@@ -1,6 +1,6 @@
 # Holiday Planner — Intent Brief
 
-**Version:** v1.0.0 — approved 2026-10-29 · **Feature:** 002-holiday-planner
+**Version:** v1.1.0 — approved 2026-10-30 · **Feature:** 002-holiday-planner
 
 ```text
 Type:            feature in Work Time Tracker                                         [you]
@@ -14,9 +14,11 @@ Inputs/Outputs:  in: Pensum, free weekdays, yearly holiday days (prefilled 20 ×
                  or half). out: year, days left, week marks. unchanged: recorded use
 NOT:             no hand corrections, no overtime balance (both dropped); no sick or  [you]          
                  private days; no weeks, only days; no dialogs; nothing to the employer
-Drivers:         zero daily effort — a few entries a year · nothing about the         [you]          
-                 person's hours or holidays leaves the laptop; one yearly request for
-                 the canton's public holidays · free, no running cost (vision)
+Drivers:         zero daily effort — a few entries a year · nothing about the         [you]
+                 person's hours or holidays leaves the laptop; the canton's public
+                 holidays are requested per canton-year (last, this, next), per
+                 reload click and after a failure (next start or 1 h later), naming
+                 only country, canton and year · free, no running cost (vision)
 Outcome:         1 the year on one screen, months as columns or rows as chosen; drag  [you]
                    books or removes days, a click goes whole → half → none; undoable
                  2 only workdays count — never a weekend, free weekday or public
@@ -49,4 +51,5 @@ Budget:          M — ≤ 4 phases, ≤ 2 review rounds per phase, ≤ 6 FRs, c
 | 13 | Additions kept | Bridge days marked; days left shown live while dragging; past days dimmed; public-holiday names in the cells | agent-introduced, you kept |
 | 14 | Budget | M | you |
 | 15 | Vision | v1.4.0: holiday planner in; hand corrections and overtime balance out; the yearly public-holiday request allowed | you |
+| 17 | Requests for public holidays | Per canton-year for last, this and next year, per reload click, after a failure at the next start or 1 h later; the developer CLI's `holidays` command run by hand sends the same request; the Recorder never connects | you |
 | 16 | Feature number | 002, the next free number, since corrections and balance are dropped | agent (how) |
