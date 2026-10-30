@@ -6,25 +6,39 @@ using System.Xml.Linq;
 namespace Wtt.Architecture.Tests;
 
 /// <summary>
-/// The dependency view of concept §3: Domain depends on nothing, Application on Domain, Infrastructure implements
-/// Application's ports, and the hosts — App, Recorder and the developer CLI — compose them without knowing each other
-/// (Recorder and App meet only in the database). The build-time BridgeTypes reads the App's bridge contract and nothing
-/// else. Domain and Application reference neither Windows nor I/O.
+/// The dependency view of concept §3: Domain depends on nothing, Application on Domain; Infrastructure and
+/// Wtt.PublicHolidays implement Application's ports without knowing each other; the hosts — App, Recorder and the
+/// developer CLI — compose them without knowing each other (Recorder and App meet only in the database), and the Recorder
+/// composes without Wtt.PublicHolidays. The build-time BridgeTypes reads the App's bridge contract and nothing else.
+/// Domain and Application reference neither Windows nor I/O, and no project but Wtt.PublicHolidays uses the network.
 /// </summary>
 public sealed class DependencyViewTests
 {
-    private static readonly string[] HostReferences = ["Wtt.Infrastructure", "Wtt.Application", "Wtt.Domain"];
+    private const string NetworkProject = "Wtt.PublicHolidays";
+
+    private static readonly string[] AdapterReferences = ["Wtt.Application", "Wtt.Domain"];
+
+    private static readonly string[] RecorderReferences = ["Wtt.Infrastructure", .. AdapterReferences];
+
+    private static readonly string[] HostReferences = [.. RecorderReferences, NetworkProject];
 
     private static readonly Dictionary<string, string[]> AllowedReferences = new()
     {
         ["Wtt.Domain"] = [],
         ["Wtt.Application"] = ["Wtt.Domain"],
-        ["Wtt.Infrastructure"] = ["Wtt.Application", "Wtt.Domain"],
+        ["Wtt.Infrastructure"] = AdapterReferences,
+        [NetworkProject] = AdapterReferences,
         ["Wtt.App"] = HostReferences,
-        ["Wtt.Recorder"] = HostReferences,
+        ["Wtt.Recorder"] = RecorderReferences,
         ["Wtt.Cli"] = HostReferences,
         ["Wtt.BridgeTypes"] = ["Wtt.App"],
     };
+
+    /// <summary>
+    /// Beyond the namespaces below, Application may hold a cancellation token and a lock for the public-holiday loads it
+    /// runs in the background — and nothing else from System.Threading.
+    /// </summary>
+    private static readonly string[] ApplicationAdmits = ["System.Threading.CancellationToken", "System.Threading.Lock"];
 
     /// <summary>
     /// The only namespaces Domain and Application may use from outside themselves. Anything else — files, streams, network,
@@ -90,7 +104,8 @@ public sealed class DependencyViewTests
 
         Assert.Empty(ReferenceViolations(ProjectReferences()));
         Assert.Empty(ForbiddenUses(Usage.Of(typeof(Wtt.Domain.Facts.ActivityFact).Assembly)));
-        Assert.Empty(ForbiddenUses(Usage.Of(typeof(Wtt.Application.Ports.IFactJournal).Assembly)));
+        Assert.Empty(ForbiddenUses(Usage.Of(typeof(Wtt.Application.Ports.IFactJournal).Assembly), ApplicationAdmits));
+        Assert.Empty(NetworkUsesOutsideTheNetworkProject(BuiltAssemblies()));
     }
 
     /// <summary>A check that cannot see a violation proves nothing by passing, so each first meets one it must report.</summary>
@@ -100,16 +115,54 @@ public sealed class DependencyViewTests
         {
             ["Wtt.Domain"] = ["Wtt.Infrastructure"],
             ["Wtt.Application"] = ["Wtt.Domain", "Wtt.App"],
-            ["Wtt.App"] = ["Wtt.Infrastructure", "Wtt.Recorder", "Wtt.BridgeTypes"],
+            ["Wtt.App"] = ["Wtt.Infrastructure", "Wtt.Recorder", "Wtt.BridgeTypes", NetworkProject],
             ["Wtt.BridgeTypes"] = ["Wtt.App", "Wtt.Infrastructure"],
+            ["Wtt.Recorder"] = ["Wtt.Infrastructure", NetworkProject],
+            ["Wtt.Infrastructure"] = ["Wtt.Application", NetworkProject],
+            [NetworkProject] = ["Wtt.Application", "Wtt.Infrastructure"],
             ["Wtt.Unplaced"] = [],
         };
         Assert.Equal(
             [
                 "Wtt.Domain → Wtt.Infrastructure", "Wtt.Application → Wtt.App", "Wtt.App → Wtt.Recorder", "Wtt.App → Wtt.BridgeTypes",
-                "Wtt.BridgeTypes → Wtt.Infrastructure", "Wtt.Unplaced has no place in the dependency view",
+                "Wtt.BridgeTypes → Wtt.Infrastructure", "Wtt.Recorder → Wtt.PublicHolidays", "Wtt.Infrastructure → Wtt.PublicHolidays",
+                "Wtt.PublicHolidays → Wtt.Infrastructure", "Wtt.Unplaced has no place in the dependency view",
             ],
             ReferenceViolations(crafted));
+
+        var networkProbe = new Usage(
+            Types:
+            [
+                "System.Net.Http.HttpClient", "System.Net.Sockets.Socket", "System.Net.WebUtility", "System.Net.Dns",
+                "System.Net.Http.Headers.MediaTypeHeaderValue+Inner", "System.Uri", "System.Text.Json.JsonDocument", "System.Networking",
+            ],
+            Members: [],
+            PInvokeMethods: []);
+        Assert.Equal(
+            [
+                "Wtt.Cli uses System.Net.Http.HttpClient", "Wtt.Cli uses System.Net.Sockets.Socket", "Wtt.Cli uses System.Net.WebUtility",
+                "Wtt.Cli uses System.Net.Dns", "Wtt.Cli uses System.Net.Http.Headers.MediaTypeHeaderValue+Inner",
+            ],
+            NetworkUsesOutsideTheNetworkProject(new Dictionary<string, Usage> { ["Wtt.Cli"] = networkProbe, [NetworkProject] = networkProbe }));
+        Assert.Contains(
+            "Wtt.PublicHolidays no longer shows the network use it exists for — the check may be blind",
+            NetworkUsesOutsideTheNetworkProject(new Dictionary<string, Usage> { [NetworkProject] = new([], [], []) }));
+
+        string[] threading =
+        [
+            "System.Threading.CancellationToken", "System.Threading.Lock", "System.Threading.Lock+Scope", "System.Threading.CancellationTokenSource",
+            "System.Threading.Thread", "System.Threading.Mutex", "System.Threading.Timer", "System.Threading.LockCookie", "System.Threading.Tasks.Task",
+        ];
+        var threadingProbe = new Usage(threading, Members: [], PInvokeMethods: []);
+        string[] neverAdmitted =
+        [
+            "uses System.Threading.CancellationTokenSource", "uses System.Threading.Thread", "uses System.Threading.Mutex", "uses System.Threading.Timer",
+            "uses System.Threading.LockCookie",
+        ];
+        Assert.Equal(neverAdmitted, ForbiddenUses(threadingProbe, ApplicationAdmits));
+        Assert.Equal(
+            ["uses System.Threading.CancellationToken", "uses System.Threading.Lock", "uses System.Threading.Lock+Scope", .. neverAdmitted],
+            ForbiddenUses(threadingProbe));
 
         string[] violating =
         [
@@ -189,23 +242,23 @@ public sealed class DependencyViewTests
         return violations;
     }
 
-    private static List<string> ForbiddenUses(Usage usage) =>
+    private static List<string> ForbiddenUses(Usage usage, IReadOnlyList<string>? admittedTypes = null) =>
     [
-        .. usage.Types.Where(type => !IsAllowed(type)).Select(type => $"uses {type}"),
+        .. usage.Types.Where(type => !IsAllowed(type, admittedTypes ?? [])).Select(type => $"uses {type}"),
         .. usage.Members.Where(DeniedMembers.Contains).Select(member => $"uses {member}"),
         .. usage.PInvokeMethods.Select(method => $"calls native code: {method}"),
     ];
 
-    private static bool IsAllowed(string type)
+    private static bool IsAllowed(string type, IReadOnlyList<string> admittedTypes)
     {
         var topLevel = type.Split('+')[0];
-        var ns = topLevel.Contains('.') ? topLevel[..topLevel.LastIndexOf('.')] : string.Empty;
+        var ns = Namespace(type);
         if (DeniedTypePrefixes.Any(prefix => topLevel.StartsWith(prefix, StringComparison.Ordinal)))
         {
             return false;
         }
 
-        if (ns == "Wtt.Domain" || ns.StartsWith("Wtt.Domain.", StringComparison.Ordinal))
+        if (ns == "Wtt.Domain" || ns.StartsWith("Wtt.Domain.", StringComparison.Ordinal) || admittedTypes.Contains(topLevel))
         {
             return true;
         }
@@ -213,6 +266,65 @@ public sealed class DependencyViewTests
         return AttributeOnlyNamespaces.Contains(ns)
             ? topLevel.EndsWith("Attribute", StringComparison.Ordinal)
             : AllowedNamespaces.Contains(ns);
+    }
+
+    /// <summary>
+    /// Every use of System.Net by a project but <see cref="NetworkProject"/> — and that project's own use, which must show,
+    /// or the check could not see one.
+    /// </summary>
+    private static List<string> NetworkUsesOutsideTheNetworkProject(IReadOnlyDictionary<string, Usage> assemblies)
+    {
+        var violations = new List<string>();
+        foreach (var (project, usage) in assemblies)
+        {
+            var network = usage.Types.Where(type => Namespace(type) is "System.Net" || Namespace(type).StartsWith("System.Net.", StringComparison.Ordinal)).ToList();
+            if (project != NetworkProject)
+            {
+                violations.AddRange(network.Select(type => $"{project} uses {type}"));
+            }
+            else if (network.Count == 0)
+            {
+                violations.Add($"{project} no longer shows the network use it exists for — the check may be blind");
+            }
+        }
+
+        return violations;
+    }
+
+    private static string Namespace(string type)
+    {
+        var topLevel = type.Split('+')[0];
+        return topLevel.Contains('.') ? topLevel[..topLevel.LastIndexOf('.')] : string.Empty;
+    }
+
+    /// <summary>
+    /// What each source project's compiled assembly uses, read from its build output of this test's configuration — the
+    /// hosts are executables this test cannot reference, and the project file names each assembly and framework.
+    /// </summary>
+    private static Dictionary<string, Usage> BuiltAssemblies()
+    {
+        var root = RepositoryRoot();
+        var configuration = new DirectoryInfo(Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory)).Parent!.Name;
+        var defaultFramework = XDocument.Load(Path.Combine(root, "Directory.Build.props")).Descendants("TargetFramework").Single().Value;
+        var assemblies = new Dictionary<string, Usage>();
+        foreach (var folder in Directory.GetDirectories(Path.Combine(root, "src")))
+        {
+            var name = Path.GetFileName(folder);
+            var projectFile = Path.Combine(folder, name + ".csproj");
+            if (!File.Exists(projectFile))
+            {
+                continue;
+            }
+
+            var project = XDocument.Load(projectFile);
+            var assemblyName = project.Descendants("AssemblyName").SingleOrDefault()?.Value ?? name;
+            var framework = project.Descendants("TargetFramework").SingleOrDefault()?.Value ?? defaultFramework;
+            var assembly = Path.Combine(folder, "bin", configuration, framework, assemblyName + ".dll");
+            Assert.True(File.Exists(assembly), $"{name} is not built at {assembly}: build the solution first.");
+            assemblies[name] = Usage.Of(assembly);
+        }
+
+        return assemblies;
     }
 
     /// <summary>Each source project's direct project references, read from its project file.</summary>
@@ -246,9 +358,11 @@ public sealed class DependencyViewTests
     /// <summary>What a compiled assembly uses from outside itself — types and their members — and the methods it implements in native code.</summary>
     private sealed record Usage(IReadOnlyList<string> Types, IReadOnlyList<string> Members, IReadOnlyList<string> PInvokeMethods)
     {
-        public static Usage Of(Assembly assembly)
+        public static Usage Of(Assembly assembly) => Of(assembly.Location);
+
+        public static Usage Of(string assemblyFile)
         {
-            using var stream = File.OpenRead(assembly.Location);
+            using var stream = File.OpenRead(assemblyFile);
             using var image = new PEReader(stream);
             var metadata = image.GetMetadataReader();
 

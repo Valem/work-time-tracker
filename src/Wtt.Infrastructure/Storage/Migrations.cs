@@ -37,6 +37,47 @@ internal static class Migrations
             saved_at     TEXT NOT NULL
         );
         """,
+        """
+        CREATE TABLE plan_settings (
+            id                INTEGER PRIMARY KEY,
+            valid_from        TEXT    NOT NULL,
+            pensum            INTEGER NOT NULL,
+            monday            INTEGER NOT NULL,
+            tuesday           INTEGER NOT NULL,
+            wednesday         INTEGER NOT NULL,
+            thursday          INTEGER NOT NULL,
+            friday            INTEGER NOT NULL,
+            yearly_half_days  INTEGER,
+            canton            TEXT,
+            saved_at          TEXT    NOT NULL
+        );
+        CREATE TABLE plan_bookings (
+            date TEXT PRIMARY KEY,
+            part TEXT NOT NULL
+        );
+        CREATE TABLE plan_ticks (
+            date TEXT PRIMARY KEY
+        );
+        CREATE TABLE public_holiday_years (
+            canton         TEXT    NOT NULL,
+            year           INTEGER NOT NULL,
+            source         TEXT    NOT NULL,
+            source_licence TEXT    NOT NULL,
+            loaded_at      TEXT    NOT NULL,
+            PRIMARY KEY (canton, year)
+        );
+        CREATE TABLE public_holidays (
+            id     INTEGER PRIMARY KEY,
+            canton TEXT    NOT NULL,
+            year   INTEGER NOT NULL,
+            date   TEXT    NOT NULL,
+            share  TEXT    NOT NULL,
+            kind   TEXT    NOT NULL,
+            reach  TEXT    NOT NULL,
+            names  TEXT    NOT NULL
+        );
+        CREATE INDEX ix_public_holidays_year ON public_holidays (canton, year);
+        """,
     ];
 
     public static int Latest => Steps.Length;

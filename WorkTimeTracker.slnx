@@ -6,6 +6,7 @@
     <Project Path="src/Wtt.Cli/Wtt.Cli.csproj" />
     <Project Path="src/Wtt.Domain/Wtt.Domain.csproj" />
     <Project Path="src/Wtt.Infrastructure/Wtt.Infrastructure.csproj" />
+    <Project Path="src/Wtt.PublicHolidays/Wtt.PublicHolidays.csproj" />
     <Project Path="src/Wtt.Recorder/Wtt.Recorder.csproj" />
   </Folder>
   <Folder Name="/tests/">

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The only project with network code: the OpenHolidays request, sent by the App host and, run by hand, by wtt-cli's
+    holidays command; and the file source that replays saved answers through the same checks. The runtime's own HTTP and
+    JSON, no package.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Wtt.Application\Wtt.Application.csproj" />
+  </ItemGroup>
+
+</Project>

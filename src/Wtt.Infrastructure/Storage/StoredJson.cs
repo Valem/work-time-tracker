@@ -14,6 +14,7 @@ internal sealed record StoredTier(int OverMinutes, int MinimumMinutes);
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(StoredDetail))]
 [JsonSerializable(typeof(List<StoredTier>))]
+[JsonSerializable(typeof(Dictionary<string, string>))]
 internal sealed partial class StoredJsonContext : JsonSerializerContext;
 
 /// <summary>The text forms of a fact's detail and of break tiers in the data file.</summary>
@@ -49,4 +50,11 @@ internal static class StoredJson
         (JsonSerializer.Deserialize(json, StoredJsonContext.Default.ListStoredTier) ?? [])
         .Select(tier => new BreakTier(TimeSpan.FromMinutes(tier.OverMinutes), TimeSpan.FromMinutes(tier.MinimumMinutes)))
         .ToList();
+
+    public static string Encode(IReadOnlyDictionary<string, string> names) =>
+        JsonSerializer.Serialize(new Dictionary<string, string>(names, StringComparer.Ordinal), StoredJsonContext.Default.DictionaryStringString);
+
+    public static IReadOnlyDictionary<string, string> DecodeNames(string json) =>
+        JsonSerializer.Deserialize(json, StoredJsonContext.Default.DictionaryStringString)
+        ?? throw new InvalidDataException("Unreadable public-holiday names.");
 }
