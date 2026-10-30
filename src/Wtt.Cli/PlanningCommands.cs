@@ -120,8 +120,9 @@ internal static class PlanningCommands
                 await output.WriteLineAsync($"click {click.Date:yyyy-MM-dd}: {PlanPrinter.Describe(clicked)}");
                 return clicked.Reverse;
             case TickStep tick:
-                var ticked = await planner.TickAsync(year, tick.Date, tick.Ticked);
-                await output.WriteLineAsync($"{(tick.Ticked ? "tick" : "untick")} {tick.Date:yyyy-MM-dd}: {PlanPrinter.Describe(ticked)}");
+                var share = tick.Share ?? await SmallestOfferedShareAsync(planner, year, tick.Date);
+                var ticked = await planner.TickAsync(year, tick.Date, share, tick.Ticked);
+                await output.WriteLineAsync($"{(tick.Ticked ? "tick" : "untick")} {tick.Date:yyyy-MM-dd} {PlanPrinter.ShareText(share)}: {PlanPrinter.Describe(ticked)}");
                 return ticked.Reverse;
             default:
                 if (undo is null)
@@ -135,6 +136,14 @@ internal static class PlanningCommands
                 return null;
         }
     }
+
+    /// <summary>The share of the date's offered entry a click would tick — the smaller — or whole where none is offered, which the planner refuses.</summary>
+    private static async Task<DayPart> SmallestOfferedShareAsync(IHolidayPlanner planner, int year, DateOnly date) =>
+        (await planner.GetSettingsAsync(year)).Offered
+            .Where(offered => offered.Entry.Date == date)
+            .Select(offered => offered.Entry.Share)
+            .DefaultIfEmpty(DayPart.Whole)
+            .Min();
 
     private static ErrorLog ErrorLogBeside(string databasePath, CliEnvironment environment) =>
         new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(databasePath))!, ErrorLog.FileName), "wtt-cli", environment.Clock);

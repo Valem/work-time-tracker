@@ -12,7 +12,8 @@ internal sealed record DragStep(DateOnly Anchor, DateOnly To) : PlanStep;
 
 internal sealed record ClickStep(DateOnly Date) : PlanStep;
 
-internal sealed record TickStep(DateOnly Date, bool Ticked) : PlanStep;
+/// <summary>Ticks or unticks the offered entry of the share — or, without one, the entry a click would.</summary>
+internal sealed record TickStep(DateOnly Date, DayPart? Share, bool Ticked) : PlanStep;
 
 /// <summary>Sends back the reversing request of the last edit before it, as the app's «Rückgängig» does.</summary>
 internal sealed record UndoStep : PlanStep;
@@ -128,8 +129,8 @@ internal sealed record PlanningOptions(
                     "--yearly-days" when Plans => Value(option, text => YearlyDays = decimal.TryParse(text, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var days) && HalfDays.Exactly(days) is { } halves ? halves : throw Invalid("a number of days in halves, such as 25 or 16.5")),
                     "--drag" when Plans => Value(option, text => Steps.Add(Drag(text))),
                     "--click" when Plans => Value(option, text => Steps.Add(new ClickStep(Date(text)))),
-                    "--tick" when Plans => Value(option, text => Steps.Add(new TickStep(Date(text), Ticked: true))),
-                    "--untick" when Plans => Value(option, text => Steps.Add(new TickStep(Date(text), Ticked: false))),
+                    "--tick" when Plans => Value(option, text => Steps.Add(Tick(text, ticked: true))),
+                    "--untick" when Plans => Value(option, text => Steps.Add(Tick(text, ticked: false))),
                     "--undo" when Plans => Flag(() => Steps.Add(new UndoStep())),
                     "--days" when Plans => Value(option, text => Days = Range(text)),
                     var file when command == CliCommand.ImportHolidays && AnswerFile is null && !file.StartsWith("--", StringComparison.Ordinal) =>
@@ -164,6 +165,14 @@ internal sealed record PlanningOptions(
             var (anchor, to) = Range(text);
             return new DragStep(anchor, to);
         }
+
+        private static TickStep Tick(string text, bool ticked) => text.Split(':') switch
+        {
+            [var date] => new TickStep(Date(date), null, ticked),
+            [var date, "half"] => new TickStep(Date(date), DayPart.Half, ticked),
+            [var date, "whole"] => new TickStep(Date(date), DayPart.Whole, ticked),
+            _ => throw Invalid("a date, optionally with :half or :whole, such as 2026-05-01:whole"),
+        };
 
         private static FormatException Invalid(string expected) => new($"expects {expected}");
 

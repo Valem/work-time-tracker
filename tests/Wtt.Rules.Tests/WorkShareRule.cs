@@ -39,6 +39,22 @@ public sealed class WorkShareRule
             Assert.Equal(WorkShare.None, halfMonday.Status("2027-09-13").Share);
         });
 
+        rule.Check("a free weekday with a public holiday that counts is that public holiday, its share none either way", () =>
+        {
+            var karfreitag = plan.Status("2027-03-26");
+            Assert.Equal(
+                (DayKind.PublicHoliday, WorkShare.None, WorkShare.Whole, "Karfreitag"),
+                (karfreitag.Kind, karfreitag.Share, karfreitag.PublicHolidayShare, karfreitag.CountingHolidays.Single().NameIn("DE")));
+            Assert.Equal((DayKind.FreeDay, WorkShare.None), (plan.Status("2027-04-02").Kind, plan.Status("2027-04-02").PublicHolidayShare));
+        });
+
+        rule.Check("the share a public holiday that counts takes shows on the day: ticked, Sechseläuten is a half public holiday", () =>
+        {
+            var sechselaeuten = plan.Status("2027-04-19");
+            Assert.Equal((DayKind.PublicHoliday, WorkShare.Half), (sechselaeuten.Kind, sechselaeuten.PublicHolidayShare));
+            Assert.Equal((DayKind.Workday, WorkShare.None), (plan.Status("2027-04-20").Kind, plan.Status("2027-04-20").PublicHolidayShare));
+        });
+
         rule.Check("the settings in force on the date give the weekday's share", () =>
         {
             var changed = new PlanScenario(Settings(2027, free: "Fri"), Settings(2028));

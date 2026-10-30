@@ -2,8 +2,8 @@ using Wtt.Domain.Planning;
 
 namespace Wtt.Application.Ports;
 
-/// <summary>Every «Mein Jahr» save in the order saved, and the bookings and ticks on the dates read.</summary>
-public sealed record PlanInputs(IReadOnlyList<PlanSettings> Settings, IReadOnlyDictionary<DateOnly, DayPart> Bookings, IReadOnlySet<DateOnly> Ticks);
+/// <summary>Every «Mein Jahr» save in the order saved, and the bookings and ticked public-holiday entries on the dates read.</summary>
+public sealed record PlanInputs(IReadOnlyList<PlanSettings> Settings, IReadOnlyDictionary<DateOnly, DayPart> Bookings, IReadOnlySet<HolidayTick> Ticks);
 
 /// <summary>How the planner lays out the year's months.</summary>
 public enum YearLayout

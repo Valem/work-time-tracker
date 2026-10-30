@@ -25,6 +25,18 @@ public sealed class PublicHolidayCountsRule
         ]
         """;
 
+    /// <summary>Solothurn's shape on Friday 01.05.2026: a half day for most districts and a whole day for one place, both part-canton.</summary>
+    private const string Solothurn2026 = """
+        [
+          {"id":"1","startDate":"2026-01-01","endDate":"2026-01-01","type":"Public","name":[{"language":"DE","text":"Neujahrstag"}],
+           "temporalScope":"FullDay","nationwide":true},
+          {"id":"2","startDate":"2026-05-01","endDate":"2026-05-01","type":"Public","name":[{"language":"DE","text":"Tag der Arbeit"}],
+           "temporalScope":"HalfDay","nationwide":false,"subdivisions":[{"code":"CH-SO-BE"},{"code":"CH-SO-LE"}]},
+          {"id":"3","startDate":"2026-05-01","endDate":"2026-05-01","type":"Public","name":[{"language":"DE","text":"Tag der Arbeit"}],
+           "temporalScope":"FullDay","nationwide":false,"subdivisions":[{"code":"CH-SO-TH-AD"}]}
+        ]
+        """;
+
     [Fact]
     public async Task BR_014_public_holiday_that_counts()
     {
@@ -57,6 +69,25 @@ public sealed class PublicHolidayCountsRule
             Assert.Equal((false, true), Counts(plan, "2027-11-11"));
             plan.Tick("2027-11-11");
             Assert.Equal((true, true), Counts(plan, "2027-11-11"));
+        });
+
+        var solothurn = await ReadAnswerAsync(Solothurn2026, Canton.SO, 2026);
+
+        rule.Check("a tick belongs to one entry: of a half and a whole part-canton holiday on Friday 01.05, each counts once its own tick is set", () =>
+        {
+            var plan = new PlanScenario(Settings(2026, canton: Canton.SO)).Loaded(solothurn);
+            Assert.Equal((false, WorkShare.Whole), Judged(plan));
+            plan.Tick("2026-05-01", share: DayPart.Half);
+            Assert.Equal((true, WorkShare.Half), Judged(plan));
+            plan.Tick("2026-05-01", share: DayPart.Whole);
+            Assert.Equal((true, WorkShare.None), Judged(plan));
+            plan.Tick("2026-05-01", ticked: false, share: DayPart.Half);
+            Assert.Equal((true, WorkShare.None), Judged(plan));
+            plan.Tick("2026-05-01", ticked: false, share: DayPart.Whole);
+            Assert.Equal((false, WorkShare.Whole), Judged(plan));
+
+            static (bool Counts, WorkShare Share) Judged(PlanScenario plan) =>
+                (plan.Status("2026-05-01").Holiday!.Counts, plan.Status("2026-05-01").Share);
         });
 
         rule.Check("the holidays of the canton in force count, not those of another canton loaded", () =>

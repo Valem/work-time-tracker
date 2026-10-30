@@ -109,12 +109,6 @@ internal sealed class PlanScenario
         return this;
     }
 
-    public PlanScenario Ticked(params string[] dates)
-    {
-        plan = plan.With(new PlanChange([], [.. dates.Select(date => new TickChange(Plans.D(date), plan.IsTicked(Plans.D(date)), true))]));
-        return this;
-    }
-
     public DayStatus Status(string date) => rules.StatusOn(Plans.D(date), Facts);
 
     public YearLedger Counts(int year, string today) => rules.CountsOf(year, Plans.D(today), Facts);
@@ -123,7 +117,12 @@ internal sealed class PlanScenario
 
     public PlanChange Click(string date) => Apply(rules.Click(Facts, Plans.D(date)));
 
-    public PlanChange Tick(string date, bool ticked = true) => Apply(rules.Tick(Facts, Plans.D(date), ticked));
+    /// <summary>The tick box: ticks the date's entry of the share — by default the only, or smaller, offered one.</summary>
+    public PlanChange Tick(string date, bool ticked = true, DayPart? share = null)
+    {
+        var offered = Facts.HolidaysOn(Plans.D(date)).Where(entry => entry.Offered).Select(entry => entry.Share).DefaultIfEmpty(DayPart.Whole).Min();
+        return Apply(rules.Tick(Facts, new HolidayTick(Plans.D(date), share ?? offered), ticked));
+    }
 
     /// <summary>The bookings held from the first date to the last, as "date part" for each booked date.</summary>
     public IReadOnlyList<string> BookingsBetween(string first, string last) =>

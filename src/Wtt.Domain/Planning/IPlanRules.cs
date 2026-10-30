@@ -13,8 +13,8 @@ public interface IPlanRules
 
     PlanChange Click(PlanFacts facts, DateOnly date);
 
-    /// <summary>Ticks or unticks the date's offered public holiday; changes nothing where none is offered.</summary>
-    PlanChange Tick(PlanFacts facts, DateOnly date, bool ticked);
+    /// <summary>Ticks or unticks the offered public-holiday entry the tick names; changes nothing where none is offered.</summary>
+    PlanChange Tick(PlanFacts facts, HolidayTick tick, bool ticked);
 
     /// <summary>The ticks that saving <paramref name="saved"/> clears.</summary>
     PlanChange TicksClearedBy(PlanFacts facts, PlanSettings saved);

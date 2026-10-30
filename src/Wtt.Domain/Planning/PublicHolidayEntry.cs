@@ -16,6 +16,12 @@ public enum HolidayReach
     PartOfCanton,
 }
 
+/// <summary>
+/// What a tick names: the public-holiday entry of a date with this share. Entries are told apart by share, so a reload of
+/// the same year keeps the person's ticks.
+/// </summary>
+public readonly record struct HolidayTick(DateOnly Date, DayPart Share);
+
 /// <summary>One public holiday on one date, as the source gives it; the names keyed by two-letter language code, upper case.</summary>
 public sealed record PublicHolidayEntry(DateOnly Date, DayPart Share, HolidayKind Kind, HolidayReach Reach, IReadOnlyDictionary<string, string> Names)
 {
@@ -24,8 +30,10 @@ public sealed record PublicHolidayEntry(DateOnly Date, DayPart Share, HolidayKin
     /// <summary>A public holiday reaching the whole country or the whole canton counts without being ticked.</summary>
     public bool CountsByItself => Kind == HolidayKind.Public && Reach != HolidayReach.PartOfCanton;
 
-    /// <summary>A holiday a click ticks: optional, or reaching only part of the canton.</summary>
-    public bool IsOptionalOrPartCanton => Kind == HolidayKind.Optional || Reach == HolidayReach.PartOfCanton;
+    /// <summary>Any other — optional, reaching only part of the canton, or of a kind not known — is offered to tick.</summary>
+    public bool Offered => !CountsByItself;
+
+    public HolidayTick Tick => new(Date, Share);
 
     /// <summary>The name in the language, else in German, else the first the source gave.</summary>
     public string NameIn(string language) =>

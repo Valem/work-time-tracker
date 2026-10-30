@@ -27,6 +27,35 @@ public sealed class ClickRule
             Assert.Equal((false, (DayPart?)null), Ticked(plan, "2027-04-19"));
         });
 
+        rule.Check("a holiday of a kind not known reaching the whole canton does not count by itself: a click ticks it, a second unticks it", () =>
+        {
+            var otherKind = new PlanScenario(Settings(2027, canton: Canton.ZH)).Loaded(Year(
+                Canton.ZH,
+                2027,
+                Holiday("2027-01-01", "Neujahrstag", reach: HolidayReach.Country),
+                Holiday("2027-11-11", "Bankfeiertag", HolidayKind.Other)));
+            otherKind.Click("2027-11-11");
+            Assert.Equal((true, (DayPart?)null), Ticked(otherKind, "2027-11-11"));
+            otherKind.Click("2027-11-11");
+            Assert.Equal((false, (DayPart?)null), Ticked(otherKind, "2027-11-11"));
+        });
+
+        rule.Check("of a half and a whole holiday on one date a click ticks and unticks the half one", () =>
+        {
+            var twoEntries = new PlanScenario(Settings(2026, canton: Canton.SO)).Loaded(Year(
+                Canton.SO,
+                2026,
+                Holiday("2026-01-01", "Neujahrstag", reach: HolidayReach.Country),
+                Holiday("2026-05-01", "Tag der Arbeit", reach: HolidayReach.PartOfCanton, share: DayPart.Half),
+                Holiday("2026-05-01", "Tag der Arbeit", reach: HolidayReach.PartOfCanton)));
+            twoEntries.Click("2026-05-01");
+            Assert.Equal(
+                [true, false],
+                twoEntries.Status("2026-05-01").Holiday!.Entries.OrderBy(entry => entry.Entry.Share).Select(entry => entry.Ticked));
+            twoEntries.Click("2026-05-01");
+            Assert.False(twoEntries.Status("2026-05-01").Holiday!.Ticked);
+        });
+
         rule.Check("where the work share is a half: none → half → none", () =>
         {
             var halfWednesday = new PlanScenario(Settings(2027, half: "Wed"));

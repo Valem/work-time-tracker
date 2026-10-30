@@ -53,8 +53,8 @@ public sealed class SettingsInForceRule
             Assert.Equal(Week(), settings.MondayToFriday);
         });
 
-        await planner.TickAsync(2027, D("2027-04-19"), ticked: true);
-        await planner.TickAsync(2028, D("2028-04-24"), ticked: true);
+        await planner.TickAsync(2027, D("2027-04-19"), DayPart.Half, ticked: true);
+        await planner.TickAsync(2028, D("2028-04-24"), DayPart.Half, ticked: true);
         await planner.SaveSettingsAsync(2028, Input(100, canton: Canton.BE));
 
         await rule.CheckAsync("saving another canton clears the ticks on the dates those settings apply to, and only those", async () =>
@@ -73,11 +73,16 @@ public sealed class SettingsInForceRule
         });
 
         await planner.SaveSettingsAsync(2028, Input(100, canton: Canton.ZH));
-        await planner.TickAsync(2028, D("2028-04-24"), ticked: true);
+        await planner.TickAsync(2028, D("2028-04-24"), DayPart.Half, ticked: true);
         await planner.SaveSettingsAsync(2027, Input(90, canton: Canton.BE));
 
         await rule.CheckAsync("the dates those settings apply to end where later saved settings start", async () =>
             Assert.Equal(["2028-04-24"], await TicksAsync(plans)));
+
+        await planner.SaveSettingsAsync(2028, Input(100));
+
+        await rule.CheckAsync("no canton where there was one is another canton: it clears the ticks too", async () =>
+            Assert.Empty(await TicksAsync(plans)));
 
         rule.AssertAllHold();
     }
@@ -98,5 +103,5 @@ public sealed class SettingsInForceRule
     }
 
     private static async Task<IReadOnlyList<string>> TicksAsync(SqlitePlanStore plans) =>
-        [.. (await plans.ReadAsync(D("2000-01-01"), D("2099-12-31"))).Ticks.Order().Select(date => $"{date:yyyy-MM-dd}")];
+        [.. (await plans.ReadAsync(D("2000-01-01"), D("2099-12-31"))).Ticks.Select(tick => tick.Date).Order().Select(date => $"{date:yyyy-MM-dd}")];
 }

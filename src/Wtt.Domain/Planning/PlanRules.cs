@@ -56,19 +56,19 @@ public sealed class PlanRules : IPlanRules
     }
 
     /// <summary>
-    /// Ticks or unticks an optional or part-canton public holiday on a date without a counting booking; otherwise cycles a
-    /// bookable date none → whole → half → none (none → half → none where its share is a half); anywhere else nothing.
+    /// Ticks or unticks a public holiday that does not count by itself — of several, the one of the smaller share — on a
+    /// date without a counting booking; otherwise cycles a bookable date none → whole → half → none (none → half → none
+    /// where its share is a half); anywhere else nothing.
     /// </summary>
     public PlanChange Click(PlanFacts facts, DateOnly date)
     {
         var day = Day(date, facts);
         var booking = facts.Plan.BookingOn(date);
-        if (day.Holiday is { } holiday
-            && holiday.Entries.Any(entry => entry.IsOptionalOrPartCanton)
-            && Counted(booking, day.Share) == HalfDays.Zero)
+        var offered = facts.HolidaysOn(date).Where(entry => entry.Offered).OrderBy(entry => entry.Share).FirstOrDefault();
+        if (offered is not null && Counted(booking, day.Share) == HalfDays.Zero)
         {
-            var ticked = facts.Plan.IsTicked(date);
-            return PlanChange.OfTick(date, ticked, !ticked);
+            var ticked = facts.Plan.IsTicked(offered.Tick);
+            return PlanChange.OfTick(offered.Tick, ticked, !ticked);
         }
 
         DayPart? next = (day.Share, booking) switch
@@ -82,14 +82,15 @@ public sealed class PlanRules : IPlanRules
         return PlanChange.OfBooking(date, booking, next);
     }
 
-    public PlanChange Tick(PlanFacts facts, DateOnly date, bool ticked) =>
-        facts.HolidaysOn(date).Any(entry => !entry.CountsByItself)
-            ? PlanChange.OfTick(date, facts.Plan.IsTicked(date), ticked)
+    public PlanChange Tick(PlanFacts facts, HolidayTick tick, bool ticked) =>
+        facts.HolidaysOn(tick.Date).Any(entry => entry.Offered && entry.Tick == tick)
+            ? PlanChange.OfTick(tick, facts.Plan.IsTicked(tick), ticked)
             : PlanChange.None;
 
     /// <summary>
-    /// Saving another canton than the one in force on the settings' start clears the ticks on the dates the new settings
-    /// apply to: from their start until later saved settings take over.
+    /// Saving another canton than the one in force on the settings' start — a canton where there was none or none where
+    /// there was one included — clears the ticks on the dates the new settings apply to: from their start until later saved
+    /// settings take over.
     /// </summary>
     public PlanChange TicksClearedBy(PlanFacts facts, PlanSettings saved)
     {
@@ -102,9 +103,10 @@ public sealed class PlanRules : IPlanRules
         return new PlanChange(
             [],
             [.. facts.Plan.Ticks
-                .Where(date => date >= saved.ValidFrom && (until is null || date < until))
-                .Order()
-                .Select(date => new TickChange(date, Before: true, After: false))]);
+                .Where(tick => tick.Date >= saved.ValidFrom && (until is null || tick.Date < until))
+                .OrderBy(tick => tick.Date)
+                .ThenBy(tick => tick.Share)
+                .Select(tick => new TickChange(tick.Date, tick.Share, Before: true, After: false))]);
     }
 
     /// <summary>A booking counts what it books, never more than the date's work share.</summary>
@@ -130,8 +132,9 @@ public sealed class PlanRules : IPlanRules
     }
 
     /// <summary>
-    /// A date's work share: its weekday's share in the settings in force — none on Saturday and Sunday — less the share of a
-    /// public holiday that counts on it, never below none.
+    /// A date's work share: its weekday's share in the settings in force — none on Saturday and Sunday — less the share of
+    /// the public holidays that count on it — the largest of theirs — never below none. An entry that does not count by
+    /// itself counts once its own tick is set.
     /// </summary>
     private static DayShare Day(DateOnly date, PlanFacts facts)
     {
@@ -142,17 +145,12 @@ public sealed class PlanRules : IPlanRules
             return new DayShare(date, weekday, WorkShare.None, null);
         }
 
-        var ticked = facts.Plan.IsTicked(date);
-        var counting = entries.Where(entry => entry.CountsByItself || ticked).ToList();
-        var offered = entries.Any(entry => !entry.CountsByItself);
-        var holiday = new DayHoliday(
-            entries,
-            Counts: counting.Count > 0,
-            Offered: offered,
-            Ticked: offered && ticked,
-            Share: entries.Max(entry => entry.Share));
-        var taken = counting.Count == 0 ? WorkShare.None : counting.Max(entry => entry.Share).AsShare();
-        return new DayShare(date, weekday, taken, holiday);
+        var holiday = new DayHoliday([.. entries.Select(entry =>
+        {
+            var ticked = entry.Offered && facts.Plan.IsTicked(entry.Tick);
+            return new HolidayOnDay(entry, Counts: entry.CountsByItself || ticked, ticked);
+        })]);
+        return new DayShare(date, weekday, holiday.Takes, holiday);
     }
 
     private sealed record DayShare(DateOnly Date, WorkShare Weekday, WorkShare TakenByHoliday, DayHoliday? Holiday)
@@ -163,8 +161,8 @@ public sealed class PlanRules : IPlanRules
 
         public DayKind Kind =>
             Date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? DayKind.Weekend
-            : Weekday == WorkShare.None ? DayKind.FreeDay
             : TakenByHoliday != WorkShare.None ? DayKind.PublicHoliday
+            : Weekday == WorkShare.None ? DayKind.FreeDay
             : DayKind.Workday;
     }
 }

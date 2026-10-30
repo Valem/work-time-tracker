@@ -16,7 +16,8 @@ public interface IHolidayPlanner
 
     Task<PlanEdit> ClickAsync(int year, DateOnly date);
 
-    Task<PlanEdit> TickAsync(int year, DateOnly date, bool ticked);
+    /// <summary>Ticks or unticks the date's offered public-holiday entry of the share — «Mein Jahr»'s tick box.</summary>
+    Task<PlanEdit> TickAsync(int year, DateOnly date, DayPart share, bool ticked);
 
     /// <summary>Writes the reversing request of the last edit exactly as it came back.</summary>
     Task<YearPlan> RestoreAsync(int year, PlanChange reverse);
@@ -84,13 +85,14 @@ public sealed class HolidayPlanner(
         return await EditAsync(view, facts, change, KindOf(change));
     }
 
-    public async Task<PlanEdit> TickAsync(int year, DateOnly date, bool ticked)
+    public async Task<PlanEdit> TickAsync(int year, DateOnly date, DayPart share, bool ticked)
     {
         var view = await ViewOfAsync(year);
         RequireInYear(year, date);
         var facts = await YearFactsAsync(year);
-        RequireOffered(facts, date);
-        var change = rules.Tick(facts, date, ticked);
+        var tick = new HolidayTick(date, share);
+        RequireOffered(facts, tick);
+        var change = rules.Tick(facts, tick, ticked);
         return await EditAsync(view, facts, change, KindOf(change));
     }
 
@@ -98,18 +100,18 @@ public sealed class HolidayPlanner(
     {
         var view = await ViewOfAsync(year);
         var bookingDates = reverse.Bookings.Select(booking => booking.Date).ToList();
-        var tickDates = reverse.Ticks.Select(tick => tick.Date).ToList();
-        if (bookingDates.Count > MaxRestoredDays || tickDates.Count > MaxRestoredDays
-            || bookingDates.Distinct().Count() != bookingDates.Count || tickDates.Distinct().Count() != tickDates.Count)
+        var ticks = reverse.Ticks.Select(change => change.Tick).ToList();
+        if (bookingDates.Count > MaxRestoredDays || ticks.Count > MaxRestoredDays
+            || bookingDates.Distinct().Count() != bookingDates.Count || ticks.Distinct().Count() != ticks.Count)
         {
-            throw new PlanRefusedException(PlanRefusal.ValueOutOfRange, $"A restore holds each date at most once and at most {MaxRestoredDays} days.");
+            throw new PlanRefusedException(PlanRefusal.ValueOutOfRange, $"A restore holds each booking and tick at most once and at most {MaxRestoredDays} days.");
         }
 
-        RequireInYear(year, bookingDates.Concat(tickDates).ToArray());
+        RequireInYear(year, bookingDates.Concat(ticks.Select(tick => tick.Date)).ToArray());
         var facts = await YearFactsAsync(year);
-        foreach (var date in tickDates)
+        foreach (var tick in ticks)
         {
-            RequireOffered(facts, date);
+            RequireOffered(facts, tick);
         }
 
         await plans.ApplyAsync(reverse);
@@ -122,12 +124,10 @@ public sealed class HolidayPlanner(
         var facts = await YearFactsAsync(year);
         var settings = facts.Settings.InForceOn(PlanSettings.StartOf(year));
         var offered = DatesOf(year)
-            .Select(date => rules.StatusOn(date, facts))
-            .Where(status => status.Holiday is { Offered: true })
-            .Select(status => new OfferedHoliday(
-                status.Date,
-                status.Holiday!.Entries.Where(entry => !entry.CountsByItself).ToList(),
-                status.Holiday.Ticked))
+            .Select(date => rules.StatusOn(date, facts).Holiday)
+            .SelectMany(holiday => holiday?.Entries ?? Enumerable.Empty<HolidayOnDay>())
+            .Where(onDay => onDay.Entry.Offered)
+            .Select(onDay => new OfferedHoliday(onDay.Entry, onDay.Ticked))
             .ToList();
         return new SettingsView(
             year,
@@ -214,11 +214,13 @@ public sealed class HolidayPlanner(
         }
     }
 
-    private void RequireOffered(PlanFacts facts, DateOnly date)
+    private static void RequireOffered(PlanFacts facts, HolidayTick tick)
     {
-        if (rules.StatusOn(date, facts).Holiday is not { Offered: true })
+        if (!facts.HolidaysOn(tick.Date).Any(entry => entry.Offered && entry.Tick == tick))
         {
-            throw new PlanRefusedException(PlanRefusal.NotOptionalHoliday, $"{date:yyyy-MM-dd} has no optional or part-canton public holiday to tick.");
+            throw new PlanRefusedException(
+                PlanRefusal.NotOptionalHoliday,
+                $"{tick.Date:yyyy-MM-dd} has no {(tick.Share == DayPart.Half ? "half" : "whole")}-day public holiday that does not count by itself, to tick.");
         }
     }
 

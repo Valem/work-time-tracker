@@ -19,7 +19,7 @@ internal static class CliApp
                wtt-cli import-holidays <answer.json> --canton <code> --year <year> --db <file>
                wtt-cli plan --db <file> --year <year> [--today <date>]
                             [--pensum <percent> [--free <days>] [--yearly-days <days>] [--canton <code>]]
-                            [--drag <from>..<to>] [--click <date>] [--tick <date>] [--untick <date>] [--undo]
+                            [--drag <from>..<to>] [--click <date>] [--tick <date>[:half|whole]] [--untick ...] [--undo]
                             [--days <from>..<to>]
 
         Commands:
@@ -55,7 +55,9 @@ internal static class CliApp
           --yearly-days <days>   plan: the yearly holiday days, such as 25 or 16.5 (default: prefilled).
           --drag <from>..<to>    plan: drag from the first date (the anchor) to the second.
           --click <date>         plan: click a date.
-          --tick / --untick <date>  plan: tick or untick the date's offered public holiday.
+          --tick / --untick <date>[:half|whole]
+                                 plan: tick or untick the date's public holiday that does not count by
+                                 itself — of two, the half-day one unless :whole names the other.
           --undo                 plan: undo the gesture before it.
           --days <from>..<to>    plan: list every date from–to instead.
         """;

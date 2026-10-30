@@ -7,7 +7,7 @@ namespace Wtt.Infrastructure.Storage;
 
 /// <summary>
 /// The person's plan as entered: «Mein Jahr» saves in the order saved — superseded, never edited — one booking per date,
-/// the ticked dates and the layout. Nothing derived is stored.
+/// the ticked public-holiday entries by date and share, and the layout. Nothing derived is stored.
 /// </summary>
 public sealed class SqlitePlanStore(SqliteDatabase database, TimeProvider clock) : IPlanStore
 {
@@ -115,19 +115,19 @@ public sealed class SqlitePlanStore(SqliteDatabase database, TimeProvider clock)
         return bookings;
     }
 
-    private static HashSet<DateOnly> ReadTicks(SqliteConnection connection, DateOnly from, DateOnly to)
+    private static HashSet<HolidayTick> ReadTicks(SqliteConnection connection, DateOnly from, DateOnly to)
     {
         using var query = Command(
             connection,
             null,
-            "SELECT date FROM plan_ticks WHERE date >= $from AND date <= $to;",
+            "SELECT date, share FROM plan_ticks WHERE date >= $from AND date <= $to;",
             ("$from", Text(from)),
             ("$to", Text(to)));
-        var ticks = new HashSet<DateOnly>();
+        var ticks = new HashSet<HolidayTick>();
         using var reader = query.ExecuteReader();
         while (reader.Read())
         {
-            ticks.Add(Date(reader.GetString(0)));
+            ticks.Add(new HolidayTick(Date(reader.GetString(0)), Enum.Parse<DayPart>(reader.GetString(1))));
         }
 
         return ticks;
@@ -148,8 +148,11 @@ public sealed class SqlitePlanStore(SqliteDatabase database, TimeProvider clock)
             using var command = Command(
                 connection,
                 transaction,
-                tick.After ? "INSERT OR IGNORE INTO plan_ticks (date) VALUES ($date);" : "DELETE FROM plan_ticks WHERE date = $date;",
-                ("$date", Text(tick.Date)));
+                tick.After
+                    ? "INSERT OR IGNORE INTO plan_ticks (date, share) VALUES ($date, $share);"
+                    : "DELETE FROM plan_ticks WHERE date = $date AND share = $share;",
+                ("$date", Text(tick.Date)),
+                ("$share", tick.Share.ToString()));
             command.ExecuteNonQuery();
         }
     }

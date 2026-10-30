@@ -46,8 +46,8 @@ public enum EditKind
 /// </summary>
 public sealed record PlanEdit(EditKind Kind, DateOnly? From, DateOnly? To, HalfDays Change, PlanChange Reverse, YearPlan Year);
 
-/// <summary>An offered public holiday — optional, part of the canton or of a kind not known — and whether it is ticked.</summary>
-public sealed record OfferedHoliday(DateOnly Date, IReadOnlyList<PublicHolidayEntry> Entries, bool Ticked);
+/// <summary>A public-holiday entry offered to tick — optional, part of the canton or of a kind not known — and whether it is ticked.</summary>
+public sealed record OfferedHoliday(PublicHolidayEntry Entry, bool Ticked);
 
 /// <summary>
 /// «Mein Jahr» of a year: the settings in force on its 1 January — yearly days null where prefilled — the offered public

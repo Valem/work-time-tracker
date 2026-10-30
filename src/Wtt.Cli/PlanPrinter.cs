@@ -9,7 +9,7 @@ namespace Wtt.Cli;
 
 internal static class PlanPrinter
 {
-    private const string HolidayRow = "  {0,-16} {1,-5}  {2,-7}  {3,-8}  {4,-18}  {5}";
+    private const string HolidayRow = "  {0,-16} {1,-5}  {2,-7}  {3,-10}  {4,-18}  {5}";
     private const string DayRow = "  {0,-16} {1,-14}  {2,-5}  {3,-7}  {4,7}  {5}";
     private const string Language = PublicHolidayEntry.FallbackLanguage;
 
@@ -36,7 +36,8 @@ internal static class PlanPrinter
         output.WriteLine($"Public holidays: {Load(settings, plan.Load)}");
         foreach (var offered in settings.Offered)
         {
-            output.WriteLine($"  offered {Day(offered.Date)}: {string.Join("; ", offered.Entries.Select(entry => entry.NameIn(Language)))} — {(offered.Ticked ? "ticked" : "not ticked")}");
+            var entry = offered.Entry;
+            output.WriteLine($"  offered {Day(entry.Date)} {Share(entry.Share)}: {entry.NameIn(Language)} ({Kind(entry.Kind)}, {Reach(entry.Reach)}) — {(offered.Ticked ? "ticked" : "not ticked")}");
         }
 
         var counts = plan.Counts;
@@ -118,14 +119,20 @@ internal static class PlanPrinter
 
         if (status.Holiday is { } holiday)
         {
-            marks.AddRange(holiday.Entries.Select(entry =>
-                $"{entry.NameIn(Language)} ({Kind(entry.Kind)}, {Reach(entry.Reach)}, {Share(entry.Share)}, {(entry.CountsByItself ? "counts" : holiday.Ticked ? "offered, ticked" : "offered")})"));
+            marks.AddRange(holiday.Entries.Select(onDay =>
+            {
+                var entry = onDay.Entry;
+                var judged = entry.CountsByItself ? "counts" : onDay.Ticked ? "ticked, counts" : "offered";
+                return $"{entry.NameIn(Language)} ({Kind(entry.Kind)}, {Reach(entry.Reach)}, {Share(entry.Share)}, {judged})";
+            }));
         }
 
         return string.Join("; ", marks);
     }
 
-    private static string Share(DayPart part) => part == DayPart.Whole ? "whole" : "half";
+    public static string ShareText(DayPart part) => part == DayPart.Whole ? "whole" : "half";
+
+    private static string Share(DayPart part) => ShareText(part);
 
     private static string WorkShareText(WorkShare share) => share switch
     {

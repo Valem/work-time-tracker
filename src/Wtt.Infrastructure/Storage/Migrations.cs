@@ -56,7 +56,9 @@ internal static class Migrations
             part TEXT NOT NULL
         );
         CREATE TABLE plan_ticks (
-            date TEXT PRIMARY KEY
+            date  TEXT NOT NULL,
+            share TEXT NOT NULL,
+            PRIMARY KEY (date, share)
         );
         CREATE TABLE public_holiday_years (
             canton         TEXT    NOT NULL,
