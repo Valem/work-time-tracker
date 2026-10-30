@@ -20,8 +20,10 @@ and another public-holiday source.
     superseded, never edited. On a date, the settings with the latest start on or before it apply; of several with one
     start, the last saved. A year without its own settings so uses the last earlier one's. «Mein Jahr» offers each
     weekday as working or free; the half share is kept for a later half free day.
-  - **Ticks:** the dates whose optional or part-canton public holiday the person marked as granted. Settings saved
-    with another canton clear the ticks on the dates those settings apply to.
+  - **Ticks:** the public-holiday entries that do not count by themselves — optional, part-canton or of a kind not
+    known — that the person marked as granted, each by its date and share, so two entries of one date are ticked apart
+    and a reload of the year keeps them. Settings saved with another canton — a canton where there was none, or none
+    where there was one, included — clear the ticks on the dates those settings apply to.
   - **Public-holiday years:** per canton and year, the entries in the domain's terms (ADR-007), names in every
     language the source gave, the source and the load time; replaced only whole.
   - **Layout:** the planner's chosen layout.
