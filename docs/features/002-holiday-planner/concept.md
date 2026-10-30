@@ -1,6 +1,6 @@
 # Holiday Planner — Technical Concept
 
-**Version:** v1.1.2 · **Feature:** 002-holiday-planner · **Brief:** [brief.md](brief.md) v1.1.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.4.1 · **Builds on:** [001 concept](../001-foundation/concept.md) v1.6.0
+**Version:** v1.1.3 · **Feature:** 002-holiday-planner · **Brief:** [brief.md](brief.md) v1.1.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.4.1 · **Builds on:** [001 concept](../001-foundation/concept.md) v1.6.0
 
 ## 1. Executive Context
 
@@ -353,8 +353,8 @@ and gestures applied through `wtt-cli plan` where a scenario needs them. Like `i
 | AC-2.5 | On a data file without plan settings: 100 %, Monday–Friday working, 20 days shown as prefilled, no canton and the load-state line asking for one; 80 % shows 16 prefilled; each weekday is offered as working or free only, and Friday free stripes every Friday and leaves it unbookable; the options are the canton's holiday entries of the year that do not count by themselves, each with its date and share; OpenHolidays and ODbL 1.0 are named; Pensum 0 or 101 and yearly days −1 are refused with their reason and save nothing. With a synthetic ZH year imported whose optional and public days are named `<img src=x>`, that name shows as plain text in its year cells and in «Mein Jahr» | FR-008, UC-007, BR-013 |
 | AC-2.6 | On a fresh data file with synthetic history from the year before last imported with `import-xml`, under a network probe: no request before a canton is chosen; choosing ZH makes one request, for the current year; an App restart makes none; showing next year makes one; showing the year before last makes none and says its holidays are not loaded; each click on «Feiertage neu laden» makes one, a click while that year is loading none; every request is NFR-001's | FR-009, UC-008 |
 | AC-2.7 | With the source blocked, the planner and its counts work and the line says the holidays are not loaded, why, and that counts may change; no further request until the App restarts or a need comes 1 h later; unblocked, the next need loads them, a booking on a loaded public holiday then counts 0, and the line shows the load date | FR-009, UC-008, BR-016 |
-| AC-2.8 | ZH 2027, 80 % with Friday free, Mon 03.05 booked whole and Tue 04.05 half: the week of Mon 03.05.2027 marks Mo «Ferien», Di «½ Ferien», Do «Feiertag · Auffahrt», Fr «frei»; a booking on a day off gets no holiday mark; AC-2.5's `<img src=x>` shows as plain text in its week mark; every day's start, end, break and total and the week total equal `wtt-cli weeks` for that data file, before and after the bookings | FR-010, UC-009, BR-015, BR-016 |
-| AC-2.9 | The week of Mon 27.12.2027 marks the days of both years; a week of a year not loaded shows its bookings and free days and no public holiday | FR-010, UC-009 |
+| AC-2.8 | ZH 2026, 80 % with Friday free, Mon 11.05 booked whole and Tue 12.05 half: the week of Mon 11.05.2026 (a past week; the week view ends at the current week) marks Mo «Ferien», Di «½ Ferien», Do «Feiertag · Auffahrt», Fr «frei»; a booking on a day off gets no holiday mark; AC-2.5's `<img src=x>` shows as plain text in its week mark; every day's start, end, break and total and the week total equal `wtt-cli weeks` for that data file, before and after the bookings | FR-010, UC-009, BR-015, BR-016 |
+| AC-2.9 | The week of Mon 29.12.2025 marks the days of both years; a week of a year not loaded shows its bookings and free days and no public holiday | FR-010, UC-009 |
 | AC-2.10 | Every new text is German with Swiss formats (e.g. «Übrig 10.5»); a copy of the de-CH texts lacking one canton or one month name fails verify | FR-007, FR-008, UC-007 |
 
 ### Phase 3: Silent and shipped
