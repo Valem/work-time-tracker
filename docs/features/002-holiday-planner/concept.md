@@ -1,6 +1,6 @@
 # Holiday Planner — Technical Concept
 
-**Version:** v1.1.3 · **Feature:** 002-holiday-planner · **Brief:** [brief.md](brief.md) v1.1.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.4.1 · **Builds on:** [001 concept](../001-foundation/concept.md) v1.6.0
+**Version:** v1.1.4 · **Feature:** 002-holiday-planner · **Brief:** [brief.md](brief.md) v1.1.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.4.1 · **Builds on:** [001 concept](../001-foundation/concept.md) v1.6.0
 
 ## 1. Executive Context
 
@@ -113,7 +113,7 @@ classDiagram
 
 Value types: `WorkShare` = none, half, whole · `DayPart` = whole, half · `HalfDays` = whole half days (33 = 16.5 days) · `Canton` = the 26 cantons · `PublicHolidayEntry` =
 date, share, kind (public, optional, other), reach (country, canton, part of the canton), names by language · `HolidayTick` = date and share of the entry ticked · `DayKind` = public holiday
-where one counts (a weekend or free weekday too), else weekend, else free day, else workday; `publicHolidayShare` = the largest share of those that count · `PlanChange` = the bookings and ticks a gesture changes, before and after; its inverse is the undo request.\
+where one counts (a weekend or free weekday too), else weekend, else free day, else workday; `publicHolidayShare` = the largest share of those that count, the whole where no work share is left beside a half one · `PlanChange` = the bookings and ticks a gesture changes, before and after; its inverse is the undo request.\
 **Invariants:** a booking is the person's intent and changes only by a drag, a click or an undo; settings are superseded, never edited; a public-holiday
 year holds only dates of its year, at most 100 entries and at least one public holiday reaching the country or the canton. `DayStatus` and `YearLedger`
 are pure functions of settings, public-holiday years, plan and today's date. `Workday` and `WorkWeek` are untouched: a day's marks never change its times.
@@ -186,7 +186,7 @@ sequenceDiagram
   Q->>D: book 22.–25. and 30.–31.03 whole, then to the UI «6 Tage eingetragen», the request reversing it, the year
   U->>H: on «Rückgängig»: planner.restore (that request, unchanged)
   H->>D: those six dates back to none, then the year as before to the UI
-  Note over U,H: the host keeps nothing between messages — the next edit, a settings save or a reload replaces or drops the UI's undo request
+  Note over U,H: the host keeps nothing between messages — the next edit replaces the UI's undo request; what else drops it is in §5 (Undo)
 ```
 
 ### UC-008 — loading a canton's public holidays
@@ -236,15 +236,15 @@ sequenceDiagram
 
 ```text
 planner.year.get      { year? }               → the year (none: the current one), previous and next year (null at the switch's ends), today, the layout, counts (yearly, taken,
-                                                planned, left; taken and planned also in ‰ of yearly), the load state (noCanton, loading, loaded with its date, notLoaded with its reason:
+                                                planned, left; taken and planned also in ‰ of yearly), the load state (noCanton, loading, loaded with its date and the reason where this run's last request failed, notLoaded with its reason:
                                                 unreachable, proxySignIn, invalid; outOfRange), 12 months, each with its days: date and weekday, kind, work share, booking, counted half
-                                                days, public-holiday share, public holidays (each: names in the active language, share, counts, offered or ticked), bridge, past, today
-planner.preview       { year, anchor, to }    → mode (book or erase), the days that would change with their new booking, counts after, change in half days
-planner.drag          { year, anchor, to }    → an edit: what changed (booked or removed, from, to, half days), the request that reverses it, the year
+                                                days, public-holiday share, public holidays (each: names in the active language, share, counts, offered or ticked), bridge, past, today, what a click would change
+planner.preview       { year, anchor, to }    → mode (book or erase), from and to in order, the days that would change with their new booking, counts after, change in half days
+planner.drag          { year, anchor, to }    → an edit: what changed (booked or removed, from, to, half days; a tick's holiday name), the request that reverses it, the year
 planner.click         { year, date }          → an edit (booked whole, booked half, removed, ticked, unticked — or nothing changed)
 planner.tick          { year, date, share, ticked } → an edit («Mein Jahr»'s tick box, one entry)
 planner.restore       { year, days, ticks }   → the year — the reversing request of the last edit, sent back unchanged
-planner.settings.get  { year }                → Pensum, Monday–Friday each working or free, yearly days or the prefilled value, canton, each holiday entry of the year that does not count by itself with date, share, names and tick, the load state, the source and its licence
+planner.settings.get  { year }                → Pensum, Monday–Friday each working or free, yearly days or the prefilled value, canton and the cantons to choose, each holiday entry of the year that does not count by itself with date, share, names and tick, the load state, the source and its licence
 planner.settings.save { year, pensum, weekdays, yearlyDays?, canton? } → as settings.get, or a refusal (nothing saved)
 planner.reload        { year }                → the load state once its one request has ended; no request while that canton-year is loading
 planner.layout.save   { layout }              → the layout (columns or rows)
@@ -256,9 +256,9 @@ week.get              (changed)               each day row also carries the mark
   never steps a date, sums a count or decides whether a day can be booked; it posts gestures as dates and formats answers. A booking that counts 0 gets no holiday mark.
 - **Gestures:** pointer down and up on one day is a click; reaching another day starts a drag, previewed at each new day with the latest answer shown; release sends the drag; Escape drops it.
   Each day is a button: Tab or the arrow keys reach it, Enter or Space does what a click does; a range is booked by dragging only.
-- **Undo:** an edit's reversing request holds the before-state of exactly the days and ticks it changed; the UI keeps only the last, and a settings save or a reload drops it; the host keeps
+- **Undo:** an edit's reversing request holds the before-state of exactly the days and ticks it changed; the UI keeps only the last, in its toast; a settings save, a reload, another year, a refused edit or the toast hiding after 8 s (not while pointed at or focused) drops it; the host keeps
   nothing and takes a restore only for dates inside its year, ticks only on offered entries, at most 366 days.
-- **Refusals:** new codes `yearOutOfRange` (outside the switch, or a reload outside last–next year), `dateNotInYear`, `notOptionalHoliday`, `noCanton`; Pensum outside 1–100, yearly days outside
+- **Refusals:** new codes `yearOutOfRange` (outside the switch or 2000–2099, or a reload outside last–next year), `dateNotInYear`, `notOptionalHoliday`, `noCanton`; Pensum outside 1–100, yearly days outside
   0–366 (a sanity bound, not a legal check) or a weekday share other than working or free → `valueOutOfRange`; else as 001. **Refresh:** as 001, and every 2 s while the shown year is loading.
 
 ### Service Interfaces
