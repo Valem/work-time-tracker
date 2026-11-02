@@ -1,6 +1,6 @@
 # Holiday Planner — Technical Concept
 
-**Version:** v1.1.5 · **Feature:** 002-holiday-planner · **Brief:** [brief.md](brief.md) v1.1.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.4.1 · **Builds on:** [001 concept](../001-foundation/concept.md) v1.6.0
+**Version:** v1.1.6 · **Feature:** 002-holiday-planner · **Brief:** [brief.md](brief.md) v1.1.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.4.1 · **Builds on:** [001 concept](../001-foundation/concept.md) v1.6.0
 
 ## 1. Executive Context
 
@@ -37,7 +37,7 @@
 |----|------|
 | BR-013 | **Settings in force:** on a date, the «Mein Jahr» settings with the latest start on or before it apply; of several with one start, the last saved. Settings saved for a year start on its 1 January and so carry into later years until one has its own. Before any save: 100 %, Monday–Friday working, yearly days prefilled, no canton. Saving another canton — a canton where there was none, or none where there was one, included — clears the ticks on the dates those settings apply to |
 | BR-014 | **Public holiday that counts:** a holiday of kind *public* reaching the whole country or the whole canton in force counts by itself; any other — optional, reaching only part of the canton, or of a kind not known — counts only once ticked. A tick belongs to one entry, named by its date and share |
-| BR-015 | **Work share:** a date's work share is its weekday's share in the settings in force — none on Saturday and Sunday — less the share of the public holidays that count on it, the largest of theirs, never below none. Only a date with a share above none can be booked |
+| BR-015 | **Work share:** a date's work share is its weekday's share in the settings in force — none on Saturday and Sunday — less the share of the public holidays that count on it, the largest of theirs, never below none; a half public holiday on a date with no work share left beside it shows as a whole one (owner). Only a date with a share above none can be booked |
 | BR-016 | **Counted booking:** a whole booking counts 1, a half 0.5, never more than the date's work share; on a date with no work share it counts 0 and stays booked |
 | BR-017 | **Year counts:** yearly days = the yearly days in force on 1 January, else 20 × the Pensum in force then, to the nearest half day; taken = counted days of the year before today; planned = counted days from today on; left = yearly − taken − planned, negative allowed |
 | BR-018 | **Drag:** a drag covers the dates from its anchor to its end, both included. When the anchor's booking counts, it removes the bookings on the bookable dates; otherwise it books every bookable date whole. Dates that cannot be booked keep what they hold |
