@@ -73,6 +73,8 @@ export interface Language {
     readonly noCanton: string;
     readonly loading: string;
     readonly loaded: (date: string) => string;
+    /** Loaded, but the last request of this run — a reload — failed; what was loaded stays. */
+    readonly loadedReloadFailed: (date: string, reason: string) => string;
     readonly notLoaded: string;
     readonly notLoadedBecause: (reason: string) => string;
     readonly reasons: Readonly<Record<LoadReason, string>>;

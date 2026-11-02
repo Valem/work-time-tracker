@@ -103,7 +103,9 @@ internal static class PlanPrinter
         {
             LoadStatus.NoCanton => "no canton chosen",
             LoadStatus.Loading => $"{what}loading",
-            LoadStatus.Loaded => string.Create(CultureInfo.InvariantCulture, $"{what}loaded {load.LoadedAt!.Value.ToUniversalTime():yyyy-MM-dd HH:mm} UTC from {settings.Source.Name}, {settings.Source.Licence}"),
+            LoadStatus.Loaded => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{what}loaded {load.LoadedAt!.Value.ToUniversalTime():yyyy-MM-dd HH:mm} UTC from {settings.Source.Name}, {settings.Source.Licence}{(load.Reason is { } reason ? $"; the last request failed ({Code(reason)})" : string.Empty)}"),
             LoadStatus.OutOfRange => $"{what}not loaded, outside last, this and next year; counts may change",
             _ => $"{what}not loaded{(load.Reason is { } reason ? $" ({Code(reason)})" : string.Empty)}; counts may change",
         };

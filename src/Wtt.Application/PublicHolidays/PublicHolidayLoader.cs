@@ -4,10 +4,7 @@ using Wtt.Domain.Planning;
 namespace Wtt.Application.PublicHolidays;
 
 /// <summary>The outcome of one load: the year stored, or the failure and its reason with what is stored kept.</summary>
-public sealed record PublicHolidayLoad(PublicHolidayYear? Year, LoadFailure? Failure, string? Reason)
-{
-    public LoadState State => Year is { } year ? LoadState.Loaded(year.LoadedAt) : LoadState.NotLoaded(Failure);
-}
+public sealed record PublicHolidayLoad(PublicHolidayYear? Year, LoadFailure? Failure, string? Reason);
 
 /// <summary>
 /// Loads one canton's public holidays of a year from a source: an answer taken whole replaces what was stored; a failure

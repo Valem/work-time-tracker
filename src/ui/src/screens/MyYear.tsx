@@ -71,11 +71,14 @@ export function MyYear({ year, revision, load, onClose, onChanged, onTick }: MyY
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [saving, setSaving] = useState(false);
   const [reloading, setReloading] = useState(false);
+  const [reloaded, setReloaded] = useState<HolidayLoadView | null>(null);
 
   useEffect(() => {
     setDraft(null);
     setOutcome(null);
   }, [year]);
+
+  useEffect(() => setReloaded(null), [year, load.status, load.loadedOn?.date, load.reason]);
 
   useEffect(() => {
     let current = true;
@@ -129,7 +132,7 @@ export function MyYear({ year, revision, load, onClose, onChanged, onTick }: MyY
   const reload = async (): Promise<void> => {
     setReloading(true);
     try {
-      await ask('planner.reload', { year });
+      setReloaded(await ask('planner.reload', { year }));
       onChanged();
     } catch (refused: unknown) {
       setOutcome({ kind: 'refused', code: refusalCodeOf(refused) });
@@ -138,7 +141,7 @@ export function MyYear({ year, revision, load, onClose, onChanged, onTick }: MyY
     }
   };
 
-  const shown: HolidayLoadView = reloading ? { status: 'loading', loadedOn: null, reason: null } : load;
+  const shown: HolidayLoadView = reloading ? { status: 'loading', loadedOn: null, reason: null } : (reloaded ?? load);
   const canReload = load.status !== 'noCanton' && load.status !== 'outOfRange';
   return (
     <section class="my-year card" aria-labelledby="my-year-heading">

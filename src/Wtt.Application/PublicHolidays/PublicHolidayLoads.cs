@@ -46,20 +46,15 @@ public sealed class PublicHolidayLoads(PublicHolidayLoader loader, IPublicHolida
             }
         }
 
+        var lastFailure = LastFailure((canton, year));
         if (await store.FindAsync(canton, year) is { } stored)
         {
-            return LoadState.Loaded(stored.LoadedAt);
+            return LoadState.Loaded(stored.LoadedAt, lastFailure);
         }
 
-        lock (gate)
-        {
-            if (failures.TryGetValue((canton, year), out var failure))
-            {
-                return LoadState.NotLoaded(failure.Reason);
-            }
-        }
-
-        return IsRequestable(year) ? LoadState.NotLoaded(null) : LoadState.OutOfRange;
+        return lastFailure is { } reason ? LoadState.NotLoaded(reason)
+            : IsRequestable(year) ? LoadState.NotLoaded(null)
+            : LoadState.OutOfRange;
     }
 
     public void Need(Canton canton, int year)
@@ -111,7 +106,7 @@ public sealed class PublicHolidayLoads(PublicHolidayLoader loader, IPublicHolida
 
             var load = await loader.LoadAsync(key.Canton, key.Year, stopping);
             Remember(key, load.Failure);
-            return load.State;
+            return await StateAfterAsync(key, load.Year, load.Failure);
         }
         catch (OperationCanceledException) when (stopping.IsCancellationRequested)
         {
@@ -121,7 +116,7 @@ public sealed class PublicHolidayLoads(PublicHolidayLoader loader, IPublicHolida
         {
             errors.Write($"Loading the public holidays of {key.Canton} {key.Year}", failure);
             Remember(key, LoadFailure.Invalid);
-            return LoadState.NotLoaded(LoadFailure.Invalid);
+            return await StateAfterAsync(key, null, LoadFailure.Invalid);
         }
         finally
         {
@@ -129,6 +124,25 @@ public sealed class PublicHolidayLoads(PublicHolidayLoader loader, IPublicHolida
             {
                 running.Remove(key);
             }
+        }
+    }
+
+    /// <summary>A failed request keeps what is stored: the state is then that year, with why the request failed.</summary>
+    private async Task<LoadState> StateAfterAsync((Canton Canton, int Year) key, PublicHolidayYear? loaded, LoadFailure? failure)
+    {
+        if (loaded is not null)
+        {
+            return LoadState.Loaded(loaded.LoadedAt);
+        }
+
+        return await store.FindAsync(key.Canton, key.Year) is { } stored ? LoadState.Loaded(stored.LoadedAt, failure) : LoadState.NotLoaded(failure);
+    }
+
+    private LoadFailure? LastFailure((Canton, int) key)
+    {
+        lock (gate)
+        {
+            return failures.TryGetValue(key, out var failure) ? failure.Reason : null;
         }
     }
 

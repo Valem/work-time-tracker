@@ -175,6 +175,7 @@ export const german: Language = {
     noCanton: 'Feiertage nicht geladen: kein Kanton gewählt – bitte unter «Mein Jahr» wählen.',
     loading: 'Feiertage werden geladen …',
     loaded: (date) => `Feiertage geladen am ${date}.`,
+    loadedReloadFailed: (date, reason) => `Feiertage geladen am ${date} · Neu laden fehlgeschlagen: ${reason}.`,
     notLoaded: 'Feiertage noch nicht geladen – die Zählung kann sich ändern.',
     notLoadedBecause: (reason) => `Feiertage nicht geladen: ${reason} – die Zählung kann sich ändern.`,
     reasons: {

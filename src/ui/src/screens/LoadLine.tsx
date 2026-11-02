@@ -11,8 +11,10 @@ export function LoadLine({ load }: { load: HolidayLoadView }) {
         return loads.noCanton;
       case 'loading':
         return loads.loading;
-      case 'loaded':
-        return loads.loaded(load.loadedOn === null ? words.language.empty : words.formats.date(load.loadedOn));
+      case 'loaded': {
+        const date = load.loadedOn === null ? words.language.empty : words.formats.date(load.loadedOn);
+        return load.reason === null ? loads.loaded(date) : loads.loadedReloadFailed(date, loads.reasons[load.reason]);
+      }
       case 'notLoaded':
         return load.reason === null ? loads.notLoaded : loads.notLoadedBecause(loads.reasons[load.reason]);
       case 'outOfRange':
