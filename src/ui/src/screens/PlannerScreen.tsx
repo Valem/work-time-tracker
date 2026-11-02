@@ -5,7 +5,7 @@ import { useWords, type Words } from '../locale/context';
 import { LoadLine } from './LoadLine';
 import { MyYear } from './MyYear';
 import { Pending } from './Notice';
-import { usePlanner } from './usePlanner';
+import { usePlanner, type Changed } from './usePlanner';
 import { YearGrid } from './YearGrid';
 
 /** How long the message after a change stays, unless the pointer or the focus rests on it. */
@@ -70,17 +70,26 @@ export function PlannerScreen({ tick }: { tick: number }) {
   }
 
   const view = planned.view;
+  const endDrag = (): void => {
+    drag.current++;
+    setPreview(null);
+  };
+
   const showYear = (other: number | null): void => {
     if (other !== null) {
+      endDrag();
       setYear(other);
       setToast(null);
-      setPreview(null);
     }
   };
 
   const refused = (code: RefusalCode): void => setToast({ text: language.refusals[code], refused: true, reverse: null });
 
-  const edited = (answer: EditView | RefusalCode): void => {
+  const edited = (answer: Changed<EditView>): void => {
+    if (answer === null) {
+      return;
+    }
+
     setRevision((value) => value + 1);
     if (typeof answer === 'string') {
       refused(answer);
@@ -107,14 +116,13 @@ export function PlannerScreen({ tick }: { tick: number }) {
     );
   };
 
-  const endDrag = (): void => {
-    drag.current++;
-    setPreview(null);
-  };
-
   const undo = (reverse: RestoreRequest): void => {
     setToast(null);
     planner.change(() => ask('planner.restore', reverse), (answer) => answer).then((answer) => {
+      if (answer === null) {
+        return;
+      }
+
       setRevision((value) => value + 1);
       if (typeof answer === 'string') {
         refused(answer);

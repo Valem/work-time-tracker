@@ -10,32 +10,40 @@ export type Planned =
   | { readonly kind: 'answered'; readonly view: YearView }
   | { readonly kind: 'refused'; readonly code: RefusalCode };
 
+/** A change's answer, or its refusal's code; null when another year has been chosen since the change was made. */
+export type Changed<T> = T | RefusalCode | null;
+
 export interface Planner {
   readonly planned: Planned;
   /**
    * Sends a change — a gesture, a tick, a restore — after every change sent before it has been answered, and shows the
-   * year it answers with. Resolves with the answer, or with the refusal's code.
+   * year it answers with, unless another year has been chosen since.
    */
-  readonly change: <T>(send: () => Promise<T>, yearOf: (answer: T) => YearView) => Promise<T | RefusalCode>;
+  readonly change: <T>(send: () => Promise<T>, yearOf: (answer: T) => YearView) => Promise<Changed<T>>;
   /** Asks for the year again, as after a saved «Mein Jahr» or a reload. */
   readonly refresh: () => void;
   readonly showLayout: (layout: MonthLayout) => void;
 }
 
 /**
- * One year of the planner as the host last answered it. Every request takes a number when it is sent, and an answer is
- * shown only if no later request's answer is shown already, so a refresh sent before a change never shows the year as it
- * was before that change. No refresh is sent while a change waits for its answer.
+ * One year of the planner as the host last answered it. Each choice of a year opens a new turn: a request belongs to the
+ * turn it was made in, and its answer shows only in that turn and only if no later request's answer shows already — so
+ * neither a refresh sent before a change nor anything asked for another year ever shows. No refresh goes while a change
+ * waits for its answer; one asked for meanwhile goes once the changes have settled.
  */
 export function usePlanner(year: number | null, tick: number): Planner {
   const [planned, setPlanned] = useState<Planned>({ kind: 'waiting' });
+  const chosen = useRef<{ readonly year: number | null; readonly turn: number } | null>(null);
   const sent = useRef(0);
   const shown = useRef(0);
   const changing = useRef(0);
+  const askWhenSettled = useRef(false);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
 
-  const show = (number: number, next: Planned): void => {
-    if (number > shown.current) {
+  const turn = (): number => chosen.current?.turn ?? 0;
+
+  const show = (madeIn: number, number: number, next: Planned): void => {
+    if (madeIn === turn() && number > shown.current) {
       shown.current = number;
       setPlanned(next);
     }
@@ -43,22 +51,26 @@ export function usePlanner(year: number | null, tick: number): Planner {
 
   const askYear = (): void => {
     if (changing.current > 0) {
+      askWhenSettled.current = true;
       return;
     }
 
+    const madeIn = turn();
     const number = ++sent.current;
-    ask('planner.year.get', { year }).then(
-      (view) => show(number, { kind: 'answered', view }),
-      (failure: unknown) => show(number, { kind: 'refused', code: refusalCodeOf(failure) }),
+    ask('planner.year.get', { year: chosen.current?.year ?? null }).then(
+      (view) => show(madeIn, number, { kind: 'answered', view }),
+      (failure: unknown) => show(madeIn, number, { kind: 'refused', code: refusalCodeOf(failure) }),
     );
   };
 
   useEffect(() => {
-    shown.current = sent.current;
-    setPlanned({ kind: 'waiting' });
-  }, [year]);
+    if (chosen.current === null || chosen.current.year !== year) {
+      chosen.current = { year, turn: turn() + 1 };
+      setPlanned({ kind: 'waiting' });
+    }
 
-  useEffect(askYear, [year, tick]);
+    askYear();
+  }, [year, tick]);
 
   const loading = planned.kind === 'answered' && planned.view.load.status === 'loading';
   useEffect(() => {
@@ -70,18 +82,23 @@ export function usePlanner(year: number | null, tick: number): Planner {
     return () => window.clearInterval(timer);
   }, [loading, year]);
 
-  const change = <T>(send: () => Promise<T>, yearOf: (answer: T) => YearView): Promise<T | RefusalCode> => {
+  const change = <T>(send: () => Promise<T>, yearOf: (answer: T) => YearView): Promise<Changed<T>> => {
+    const madeIn = turn();
     changing.current++;
-    const run = queue.current.then(async () => {
+    const run = queue.current.then(async (): Promise<Changed<T>> => {
       const number = ++sent.current;
       try {
         const answer = await send();
-        show(number, { kind: 'answered', view: yearOf(answer) });
-        return answer;
+        show(madeIn, number, { kind: 'answered', view: yearOf(answer) });
+        return madeIn === turn() ? answer : null;
       } catch (failure: unknown) {
-        return refusalCodeOf(failure);
+        return madeIn === turn() ? refusalCodeOf(failure) : null;
       } finally {
         changing.current--;
+        if (changing.current === 0 && askWhenSettled.current) {
+          askWhenSettled.current = false;
+          askYear();
+        }
       }
     });
     queue.current = run;
