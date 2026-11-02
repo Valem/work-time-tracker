@@ -1,8 +1,8 @@
 import type {
   CalendarDay,
   Canton,
+  ClickOutcome,
   DayType,
-  EditOutcome,
   IsoWeek,
   LoadReason,
   PauseRole,
@@ -152,9 +152,8 @@ export interface Planner {
   readonly granted: (name: string) => string;
   readonly bridge: string;
   readonly today: string;
-  /** What a click on the day would change. */
-  readonly onClick: Readonly<Record<EditOutcome, string>>;
-  readonly halfOnlyByDrag: string;
+  /** What a click on the day would change: its booking, or nothing. */
+  readonly onClick: Readonly<Record<ClickOutcome, string>>;
   readonly dayTitle: (day: string, parts: readonly string[]) => string;
   readonly legend: {
     readonly holiday: string;

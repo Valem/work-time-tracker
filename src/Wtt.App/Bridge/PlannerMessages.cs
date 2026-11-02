@@ -62,7 +62,7 @@ public enum DragKind
     Erase,
 }
 
-/// <summary>What an edit changed, or what a click on a day would change.</summary>
+/// <summary>What an edit changed.</summary>
 public enum EditOutcome
 {
     Nothing,
@@ -72,6 +72,15 @@ public enum EditOutcome
     Removed,
     Ticked,
     Unticked,
+}
+
+/// <summary>What a click on a day would change: its booking, or nothing — a click never ticks.</summary>
+public enum ClickOutcome
+{
+    Nothing,
+    BookedWhole,
+    BookedHalf,
+    Removed,
 }
 
 /// <summary>«Mein Jahr» offers each weekday Monday to Friday as working or free only.</summary>
@@ -109,7 +118,7 @@ public sealed record PlanDay(
     bool Bridge,
     bool Past,
     bool Today,
-    EditOutcome OnClick);
+    ClickOutcome OnClick);
 
 public sealed record MonthView(int Month, IReadOnlyList<PlanDay> Days);
 

@@ -244,10 +244,6 @@ function titleOf(day: PlanDay, words: Words): string {
   }
 
   parts.push(planner.onClick[day.onClick]);
-  if (day.onClick === 'unticked' && day.share === 'half' && day.booking === null) {
-    parts.push(planner.halfOnlyByDrag);
-  }
-
   return planner.dayTitle(words.day(day.day), parts);
 }
 

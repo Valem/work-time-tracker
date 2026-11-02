@@ -11,6 +11,7 @@ public interface IPlanRules
 
     PlanChange Drag(PlanFacts facts, DateOnly anchor, DateOnly to);
 
+    /// <summary>Cycles a bookable date's booking; never ticks.</summary>
     PlanChange Click(PlanFacts facts, DateOnly date);
 
     /// <summary>Ticks or unticks the offered public-holiday entry the tick names; changes nothing where none is offered.</summary>

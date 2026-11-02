@@ -142,7 +142,14 @@ internal static class PlanViews
             status.Bridge,
             day.Past,
             day.Today,
-            OutcomeOf(day.OnClick));
+            day.OnClick switch
+            {
+                EditKind.Nothing => ClickOutcome.Nothing,
+                EditKind.BookedWhole => ClickOutcome.BookedWhole,
+                EditKind.BookedHalf => ClickOutcome.BookedHalf,
+                EditKind.Removed => ClickOutcome.Removed,
+                _ => throw new ArgumentOutOfRangeException(nameof(day), day.OnClick, "A click changes a booking or nothing."),
+            });
     }
 
     private static YearCounts Counts(YearLedger counts) => new(

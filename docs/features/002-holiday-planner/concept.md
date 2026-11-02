@@ -1,6 +1,6 @@
 # Holiday Planner — Technical Concept
 
-**Version:** v1.1.4 · **Feature:** 002-holiday-planner · **Brief:** [brief.md](brief.md) v1.1.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.4.1 · **Builds on:** [001 concept](../001-foundation/concept.md) v1.6.0
+**Version:** v1.1.5 · **Feature:** 002-holiday-planner · **Brief:** [brief.md](brief.md) v1.1.0 (approved) · **Vision:** [vision.md](../../vision.md) v1.4.1 · **Builds on:** [001 concept](../001-foundation/concept.md) v1.6.0
 
 ## 1. Executive Context
 
@@ -22,7 +22,7 @@
 
 | FR | Description | Technical Solution |
 |----|-------------|--------------------|
-| FR-007 | The whole year on one screen, months as columns or rows as chosen; drag over free days books them, over holiday days removes them; a click goes whole → half → none, and the keyboard reaches each day and does the same; the last change can be undone; yearly, taken, planned and left always in view and live while dragging; bridge days marked, past days dimmed, today outlined, public-holiday names in the cells; a switch to past years and next year (outcomes 1, 2, 5; H1–H4, H7, H10, H16–H18, H20) | Preact year screen over the bridge; the UI sends gestures, the domain decides; a preview message carries the live counts (ADR-009) |
+| FR-007 | The whole year on one screen, months as columns or rows as chosen; drag over free days books them, over holiday days removes them; a click on a bookable day goes whole → half → none — public holidays are ticked in «Mein Jahr» only — and the keyboard reaches each day and does the same; the last change can be undone; yearly, taken, planned and left always in view and live while dragging; bridge days marked, past days dimmed, today outlined, public-holiday names in the cells; a switch to past years and next year (outcomes 1, 2, 5; H1–H4, H7, H10, H17, H18, H20) | Preact year screen over the bridge; the UI sends gestures, the domain decides; a preview message carries the live counts (ADR-009) |
 | FR-008 | «Mein Jahr»: Pensum, each weekday working or free, yearly holiday days prefilled 20 × Pensum, canton, ticks for granted optional public holidays; it carries into the next year with the ticks empty, and a change applies to the whole planned year while earlier years keep theirs; a booking on a day that becomes a day off stays and counts 0 (H5, H11–H13) | Dated plan settings and per-day bookings (ADR-008, BR-013, BR-016) |
 | FR-009 | The canton's public holidays of a year appear without any entry; the others — optional, part-canton, unknown kinds — count once ticked, each entry on its own; a half public holiday leaves half a day bookable; the planner says whether they are loaded and works without them; «Feiertage neu laden» on request; the source and its licence named (outcome 3; H6, H8, H9, H14) | Neutral port, OpenHolidays adapter in `Wtt.PublicHolidays`, requested by the App host (ADR-007) |
 | FR-010 | The week marks holiday, half holiday, public holiday, half public holiday and free day — as they count — beside each day's unchanged times (outcome 4; H19) | Week rows carry the domain's day marks (§5) |
@@ -41,7 +41,7 @@
 | BR-016 | **Counted booking:** a whole booking counts 1, a half 0.5, never more than the date's work share; on a date with no work share it counts 0 and stays booked |
 | BR-017 | **Year counts:** yearly days = the yearly days in force on 1 January, else 20 × the Pensum in force then, to the nearest half day; taken = counted days of the year before today; planned = counted days from today on; left = yearly − taken − planned, negative allowed |
 | BR-018 | **Drag:** a drag covers the dates from its anchor to its end, both included. When the anchor's booking counts, it removes the bookings on the bookable dates; otherwise it books every bookable date whole. Dates that cannot be booked keep what they hold |
-| BR-019 | **Click:** on a date with a public holiday that does not count by itself and no counting booking, a click ticks or unticks it — of two, the one of the smaller share. On a bookable date it goes none → whole → half → none; where the work share is a half, none → half → none, a whole booking going to none. Anywhere else it changes nothing |
+| BR-019 | **Click:** a click on a date with a bookable share cycles its booking none → whole → half → none; where the work share is a half, none → half → none, a whole booking going to none. On any other date it changes nothing. A click never ticks: public holidays are ticked only in «Mein Jahr» |
 | BR-020 | **Bridge day:** a bookable, unbooked date of whole work share whose two neighbours both have no work share, at least one of them because of a public holiday that counts — one that takes a working weekday's share |
 
 ### Traceability Matrix
@@ -238,10 +238,10 @@ sequenceDiagram
 planner.year.get      { year? }               → the year (none: the current one), previous and next year (null at the switch's ends), today, the layout, counts (yearly, taken,
                                                 planned, left; taken and planned also in ‰ of yearly), the load state (noCanton, loading, loaded with its date and the reason where this run's last request failed, notLoaded with its reason:
                                                 unreachable, proxySignIn, invalid; outOfRange), 12 months, each with its days: date and weekday, kind, work share, booking, counted half
-                                                days, public-holiday share, public holidays (each: names in the active language, share, counts, offered or ticked), bridge, past, today, what a click would change
+                                                days, public-holiday share, public holidays (each: names in the active language, share, counts, offered or ticked), bridge, past, today, what a click would change (booked whole, booked half, removed or nothing)
 planner.preview       { year, anchor, to }    → mode (book or erase), from and to in order, the days that would change with their new booking, counts after, change in half days
 planner.drag          { year, anchor, to }    → an edit: what changed (booked or removed, from, to, half days; a tick's holiday name), the request that reverses it, the year
-planner.click         { year, date }          → an edit (booked whole, booked half, removed, ticked, unticked — or nothing changed)
+planner.click         { year, date }          → an edit (booked whole, booked half, removed — or nothing changed); a click never ticks
 planner.tick          { year, date, share, ticked } → an edit («Mein Jahr»'s tick box, one entry)
 planner.restore       { year, days, ticks }   → the year — the reversing request of the last edit, sent back unchanged
 planner.settings.get  { year }                → Pensum, Monday–Friday each working or free, yearly days or the prefilled value, canton and the cantons to choose, each holiday entry of the year that does not count by itself with date, share, names and tick, the load state, the source and its licence
@@ -255,7 +255,7 @@ week.get              (changed)               each day row also carries the mark
 - **Values:** day amounts cross as whole half days; years as numbers; dates as in 001. The host supplies all a screen shows — months, days, flags, ‰ shares, previous and next year — so the UI
   never steps a date, sums a count or decides whether a day can be booked; it posts gestures as dates and formats answers. A booking that counts 0 gets no holiday mark.
 - **Gestures:** pointer down and up on one day is a click; reaching another day starts a drag, previewed at each new day with the latest answer shown; release sends the drag; Escape drops it.
-  Each day is a button: Tab or the arrow keys reach it, Enter or Space does what a click does; a range is booked by dragging only.
+  Each day is a button: Tab or the arrow keys reach it, Enter or Space does what a click does; a range is booked by dragging only; ticks are set in «Mein Jahr» only.
 - **Undo:** an edit's reversing request holds the before-state of exactly the days and ticks it changed; the UI keeps only the last, in its toast; a settings save, a reload, another year, a refused edit or the toast hiding after 8 s (not while pointed at or focused) drops it; the host keeps
   nothing and takes a restore only for dates inside its year, ticks only on offered entries, at most 366 days.
 - **Refusals:** new codes `yearOutOfRange` (outside the switch or 2000–2099, or a reload outside last–next year), `dateNotInYear`, `notOptionalHoliday`, `noCanton`; Pensum outside 1–100, yearly days outside
@@ -323,7 +323,7 @@ and gestures applied through `wtt-cli plan` where a scenario needs them. Like `i
 |----|----------|-----------|
 | AC-1.1 | ZH 2027, 80 % with Friday free: a drag from Mon 22.03 to Wed 31.03 books 22.–25. and 30.–31.03 — 6 days; 26.03 (Karfreitag, a Friday), 27.–28.03 and 29.03 (Ostermontag) stay unbooked; a drag from 23.03 to 24.03 then removes 2 → 4 | FR-007, BR-015, BR-016, BR-018 |
 | AC-1.2 | 80 % with Friday free and no yearly days saved → yearly 16; 83 % → 16.5. Bookings 18.–21.01, 15.06 whole and 14.09 half: `wtt-cli plan --db <scratch> --year 2027 --today 2027-06-15` shows taken 4, planned 1.5, left 10.5; with `--today 2028-01-01`, taken 5.5, planned 0 | FR-007, BR-017 |
-| AC-1.3 | ZH 2027, 100 %: clicks on Tue 20.04 go none → whole → half → none. Mon 19.04 (Sechseläuten: optional, part of the canton, half day) counts no holiday until ticked; a click ticks it, a second unticks it. Booked whole by a drag it counts 1; ticked, it counts 0.5; unticked, 1 again | FR-007, BR-014, BR-015, BR-016, BR-019 |
+| AC-1.3 | ZH 2027, 100 %: clicks on Tue 20.04 go none → whole → half → none. Mon 19.04 (Sechseläuten: optional, part of the canton, half day) counts no holiday until ticked in «Mein Jahr»; then a click books its free half (½ Ferien, counts 0.5), a second removes it. Booked whole by a drag it counts 1; ticked, it counts 0.5; unticked, 1 again | FR-007, BR-014, BR-015, BR-016, BR-019 |
 | AC-1.4 | AG 2027: Karfreitag 26.03 (the whole canton) counts by itself; Ostermontag 29.03 (parts of the canton) is offered and counts only once ticked | FR-009, BR-014 |
 | AC-1.5 | ZH 2027, 100 %: Fri 07.05 (Thursday Auffahrt, then Saturday) is a bridge day; booked, it is none; with Friday free, it is a free day and no bridge day | FR-007, BR-020 |
 | AC-1.6 | With `--today` in 2027, settings saved for 2028 (100 %, ZH), then for 2027 (80 %, Friday free, 25 days, ZH): 2027's dates use 2027's, 2028's and 2029's use 2028's (20 days), 2026 keeps 100 %, Monday–Friday, no canton. With Sechseläuten ticked in 2027 and in 2028, settings saved for 2028 with canton BE remove the 2028 tick and keep the 2027 tick and 2027's settings. A booked Friday of 2027 counts 0, and 1 again once Friday is a workday | FR-008, BR-013, BR-016 |
@@ -347,7 +347,7 @@ and gestures applied through `wtt-cli plan` where a scenario needs them. Like `i
 | AC | Criteria | Traces To |
 |----|----------|-----------|
 | AC-2.1 | In a window of 1536 × 864 (1920 × 1080 at 125 %), every day of 2027 shows without scrolling, months as columns by default and as rows when chosen; the choice holds after the App restarts; past days are dimmed, today outlined, public-holiday names in their cells, bridge days marked; the switch reaches from last year — or the oldest kept fact's year, if earlier — to next year | FR-007, UC-006 |
-| AC-2.2 | AC-1.1's and AC-1.3's gestures done by mouse give their bookings and counts; after each change «Rückgängig» restores the bookings, ticks and counts before it; after two changes only the second can be undone; Escape during a drag changes nothing | FR-007, UC-006, BR-018, BR-019 |
+| AC-2.2 | AC-1.1's and AC-1.3's gestures done by mouse — Sechseläuten ticked in «Mein Jahr», then a click books its free half (½ Ferien, counts 0.5) — give their bookings and counts; after each change «Rückgängig» restores the bookings, ticks and counts before it; after two changes only the second can be undone; Escape during a drag changes nothing | FR-007, UC-006, BR-018, BR-019 |
 | AC-2.3 | Tab and the arrow keys reach every day of 2027; Enter or Space on a day does what AC-1.3's click does; a range is booked only by dragging | FR-007, UC-006, BR-019 |
 | AC-2.4 | While AC-1.1's drag reaches 31.03 the bar shows +6 and the days left after it; after release yearly, taken, planned and left equal that preview; over 200 days reached, 95 % of preview round trips, timed in a Debug build's DevTools on the target laptop, answer within 100 ms (NFR-007) | FR-007, UC-006, BR-017 |
 | AC-2.5 | On a data file without plan settings: 100 %, Monday–Friday working, 20 days shown as prefilled, no canton and the load-state line asking for one; 80 % shows 16 prefilled; each weekday is offered as working or free only, and Friday free stripes every Friday and leaves it unbookable; the options are the canton's holiday entries of the year that do not count by themselves, each with its date and share; OpenHolidays and ODbL 1.0 are named; Pensum 0 or 101 and yearly days −1 are refused with their reason and save nothing. With a synthetic ZH year imported whose optional and public days are named `<img src=x>`, that name shows as plain text in its year cells and in «Mein Jahr» | FR-008, UC-007, BR-013 |
@@ -393,7 +393,7 @@ and gestures applied through `wtt-cli plan` where a scenario needs them. Like `i
 | H13 | A canton change clears the ticks | Ticks belong to the old canton's days | synthesis | Keep (owner) |
 | H14 | «Feiertage neu laden» — one request on the person's click | The remedy once the source has fixed wrong data | competing design B | Keep (owner) |
 | H15 | Undo through the whole session | Undo beyond the last change | competing design B | Cut (owner): only the last change can be undone |
-| H16 | A click on a public holiday that does not count by itself ticks it | Granting a holiday where it shows | prototype 5 (owner) | Keep (owner) |
+| H16 | A click on a public holiday that does not count by itself ticks it | Granting a holiday where it shows | prototype 5 (owner) | Cut (owner, M1): a tick is a setting, set in «Mein Jahr» only |
 | H17 | Today outlined | Today's place in the year | prototype 5 (owner) | Keep (owner) |
 | H18 | An undo message naming the change, and the counts meter | The change and the year's use at a glance | prototype 5 (owner) | Keep (owner) |
 | H19 | The week mark «½ Feiertag» for a half public holiday | Follows from H6 | design review v1.0.0 | Keep (owner, with H6) |

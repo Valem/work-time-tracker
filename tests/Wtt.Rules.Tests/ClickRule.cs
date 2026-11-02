@@ -9,63 +9,28 @@ public sealed class ClickRule
     public void BR_019_click()
     {
         var rule = new RuleScenarios();
-        var plan = new PlanScenario(Settings(2027, canton: Canton.ZH)).Loaded(Zurich2027);
 
-        rule.Check("on a bookable date of whole share clicks go none → whole → half → none", () => Assert.Equal(
-            [DayPart.Whole, DayPart.Half, null],
-            Enumerable.Range(0, 3).Select(_ =>
-            {
-                plan.Click("2027-04-20");
-                return plan.Status("2027-04-20").Booking;
-            })));
-
-        rule.Check("on an optional, part-canton holiday without a counting booking a click ticks it, a second unticks it", () =>
+        rule.Check("on a bookable date of whole share clicks go none → whole → half → none", () =>
         {
-            plan.Click("2027-04-19");
-            Assert.Equal((true, (DayPart?)null), Ticked(plan, "2027-04-19"));
-            plan.Click("2027-04-19");
-            Assert.Equal((false, (DayPart?)null), Ticked(plan, "2027-04-19"));
-        });
-
-        rule.Check("a holiday of a kind not known reaching the whole canton does not count by itself: a click ticks it, a second unticks it", () =>
-        {
-            var otherKind = new PlanScenario(Settings(2027, canton: Canton.ZH)).Loaded(Year(
-                Canton.ZH,
-                2027,
-                Holiday("2027-01-01", "Neujahrstag", reach: HolidayReach.Country),
-                Holiday("2027-11-11", "Bankfeiertag", HolidayKind.Other)));
-            otherKind.Click("2027-11-11");
-            Assert.Equal((true, (DayPart?)null), Ticked(otherKind, "2027-11-11"));
-            otherKind.Click("2027-11-11");
-            Assert.Equal((false, (DayPart?)null), Ticked(otherKind, "2027-11-11"));
-        });
-
-        rule.Check("of a half and a whole holiday on one date a click ticks and unticks the half one", () =>
-        {
-            var twoEntries = new PlanScenario(Settings(2026, canton: Canton.SO)).Loaded(Year(
-                Canton.SO,
-                2026,
-                Holiday("2026-01-01", "Neujahrstag", reach: HolidayReach.Country),
-                Holiday("2026-05-01", "Tag der Arbeit", reach: HolidayReach.PartOfCanton, share: DayPart.Half),
-                Holiday("2026-05-01", "Tag der Arbeit", reach: HolidayReach.PartOfCanton)));
-            twoEntries.Click("2026-05-01");
-            Assert.Equal(
-                [true, false],
-                twoEntries.Status("2026-05-01").Holiday!.Entries.OrderBy(entry => entry.Entry.Share).Select(entry => entry.Ticked));
-            twoEntries.Click("2026-05-01");
-            Assert.False(twoEntries.Status("2026-05-01").Holiday!.Ticked);
+            var plan = new PlanScenario(Settings(2027, canton: Canton.ZH)).Loaded(Zurich2027);
+            Assert.Equal([DayPart.Whole, DayPart.Half, null], Clicks(plan, "2027-04-20", 3));
         });
 
         rule.Check("where the work share is a half: none → half → none", () =>
         {
             var halfWednesday = new PlanScenario(Settings(2027, half: "Wed"));
-            halfWednesday.Click("2027-04-21");
-            Assert.Equal(DayPart.Half, halfWednesday.Status("2027-04-21").Booking);
-            halfWednesday.Click("2027-04-21");
-            Assert.Null(halfWednesday.Status("2027-04-21").Booking);
+            Assert.Equal([DayPart.Half, null], Clicks(halfWednesday, "2027-04-21", 2));
         });
 
-        rule.Check("where the work share is a half a whole booking goes to none", () =>
+        rule.Check("a ticked half public holiday leaves half a day: clicks go none → half → none and the tick stays", () =>
+        {
+            var sechselaeuten = new PlanScenario(Settings(2027, canton: Canton.ZH)).Loaded(Zurich2027);
+            sechselaeuten.Tick("2027-04-19");
+            Assert.Equal([DayPart.Half, null], Clicks(sechselaeuten, "2027-04-19", 2));
+            Assert.True(sechselaeuten.Status("2027-04-19").Holiday!.Ticked);
+        });
+
+        rule.Check("where the work share is a half a whole booking goes to none, the tick staying", () =>
         {
             var sechselaeuten = new PlanScenario(Settings(2027, canton: Canton.ZH)).Loaded(Zurich2027);
             sechselaeuten.Drag("2027-04-19", "2027-04-19");
@@ -74,25 +39,40 @@ public sealed class ClickRule
             Assert.Equal((true, (DayPart?)null), Ticked(sechselaeuten, "2027-04-19"));
         });
 
-        rule.Check("on an optional holiday whose booking counts a click cycles the booking and leaves the tick", () =>
+        rule.Check("an offered holiday not ticked is a workday for the click: none → whole → half → none, never ticked", () =>
         {
-            var booked = new PlanScenario(Settings(2027, canton: Canton.ZH)).Loaded(Zurich2027);
-            booked.Drag("2027-04-19", "2027-04-19");
-            booked.Click("2027-04-19");
-            Assert.Equal((false, (DayPart?)DayPart.Half), Ticked(booked, "2027-04-19"));
+            var offered = new PlanScenario(Settings(2027, canton: Canton.ZH)).Loaded(Zurich2027);
+            Assert.Equal([DayPart.Whole, DayPart.Half, null], Clicks(offered, "2027-04-19", 3));
+            Assert.False(offered.Status("2027-04-19").Holiday!.Ticked);
         });
 
-        rule.Check("on an optional holiday whose booking counts 0 a click ticks it", () =>
+        rule.Check("a click never changes a tick: a holiday of a kind not known, and two entries on one date, are booked, not ticked", () =>
         {
-            var freeMonday = new PlanScenario(Settings(2027, free: "Mon", canton: Canton.ZH)).Loaded(Zurich2027).Booked(DayPart.Whole, "2027-09-13");
-            freeMonday.Click("2027-09-13");
-            Assert.Equal((true, (DayPart?)DayPart.Whole), Ticked(freeMonday, "2027-09-13"));
+            var otherKind = new PlanScenario(Settings(2027, canton: Canton.ZH)).Loaded(Year(
+                Canton.ZH,
+                2027,
+                Holiday("2027-01-01", "Neujahrstag", reach: HolidayReach.Country),
+                Holiday("2027-11-11", "Bankfeiertag", HolidayKind.Other)));
+            Assert.Empty(otherKind.Click("2027-11-11").Ticks);
+            Assert.Equal((false, (DayPart?)DayPart.Whole), Ticked(otherKind, "2027-11-11"));
+
+            var twoEntries = new PlanScenario(Settings(2026, canton: Canton.SO)).Loaded(Year(
+                Canton.SO,
+                2026,
+                Holiday("2026-01-01", "Neujahrstag", reach: HolidayReach.Country),
+                Holiday("2026-05-01", "Tag der Arbeit", reach: HolidayReach.PartOfCanton, share: DayPart.Half),
+                Holiday("2026-05-01", "Tag der Arbeit", reach: HolidayReach.PartOfCanton)));
+            twoEntries.Tick("2026-05-01", share: DayPart.Whole);
+            Assert.Empty(twoEntries.Click("2026-05-01").Ticks);
+            Assert.Equal(
+                [false, true],
+                twoEntries.Status("2026-05-01").Holiday!.Entries.OrderBy(entry => entry.Entry.Share).Select(entry => entry.Ticked));
         });
 
-        rule.Check("anywhere else a click changes nothing: a weekend, a free day, a public holiday that counts", () =>
+        rule.Check("anywhere else a click changes nothing: a weekend, a free day, a public holiday that counts, a booking on a free day", () =>
         {
-            var freeFriday = new PlanScenario(Settings(2027, free: "Fri", canton: Canton.ZH)).Loaded(Zurich2027);
-            foreach (var date in new[] { "2027-04-24", "2027-04-25", "2027-04-23", "2027-03-29", "2027-05-06" })
+            var freeFriday = new PlanScenario(Settings(2027, free: "Fri", canton: Canton.ZH)).Loaded(Zurich2027).Booked(DayPart.Whole, "2027-04-30");
+            foreach (var date in new[] { "2027-04-24", "2027-04-25", "2027-04-23", "2027-03-29", "2027-05-06", "2027-04-30" })
             {
                 Assert.Equal((date, true), (date, freeFriday.Click(date).IsEmpty));
             }
@@ -100,6 +80,14 @@ public sealed class ClickRule
 
         rule.AssertAllHold();
     }
+
+    /// <summary>The booking the date holds after each of a number of clicks.</summary>
+    private static IReadOnlyList<DayPart?> Clicks(PlanScenario plan, string date, int clicks) =>
+        [.. Enumerable.Range(0, clicks).Select(_ =>
+        {
+            plan.Click(date);
+            return plan.Status(date).Booking;
+        })];
 
     private static (bool Ticked, DayPart? Booking) Ticked(PlanScenario plan, string date)
     {

@@ -56,21 +56,13 @@ public sealed class PlanRules : IPlanRules
     }
 
     /// <summary>
-    /// Ticks or unticks a public holiday that does not count by itself — of several, the one of the smaller share — on a
-    /// date without a counting booking; otherwise cycles a bookable date none → whole → half → none (none → half → none
-    /// where its share is a half); anywhere else nothing.
+    /// Cycles a bookable date's booking none → whole → half → none — none → half → none where its share is a half, a whole
+    /// booking going to none; anywhere else nothing. A click never ticks: public holidays are ticked in «Mein Jahr» only.
     /// </summary>
     public PlanChange Click(PlanFacts facts, DateOnly date)
     {
         var day = Day(date, facts);
         var booking = facts.Plan.BookingOn(date);
-        var offered = facts.HolidaysOn(date).Where(entry => entry.Offered).OrderBy(entry => entry.Share).FirstOrDefault();
-        if (offered is not null && Counted(booking, day.Share) == HalfDays.Zero)
-        {
-            var ticked = facts.Plan.IsTicked(offered.Tick);
-            return PlanChange.OfTick(offered.Tick, ticked, !ticked);
-        }
-
         DayPart? next = (day.Share, booking) switch
         {
             (WorkShare.Whole, null) => DayPart.Whole,
