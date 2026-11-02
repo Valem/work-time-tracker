@@ -59,6 +59,27 @@ public sealed class WorkShareRule
             Assert.Equal((DayKind.Weekend, WorkShare.None), (plan.Status("2027-05-02").Kind, plan.Status("2027-05-02").Share));
         });
 
+        rule.Check("a half public holiday shows whole where no work share is left beside it — a Saturday, a free Monday — and half beside half a day's work; what bookings count is unchanged", () =>
+        {
+            var halves = new PlanScenario(Settings(2027, free: "Mon", canton: Canton.ZH)).Loaded(Year(
+                Canton.ZH,
+                2027,
+                Holiday("2027-01-01", "Neujahrstag", reach: HolidayReach.Country),
+                Holiday("2027-04-19", "Halber Montag", share: DayPart.Half),
+                Holiday("2027-04-24", "Halber Samstag", share: DayPart.Half),
+                Holiday("2027-04-27", "Halber Dienstag", share: DayPart.Half)));
+            halves.Booked(DayPart.Whole, "2027-04-19", "2027-04-24", "2027-04-27");
+            Assert.Equal(
+                [
+                    (DayKind.PublicHoliday, WorkShare.Whole, WorkShare.None, HalfDays.Zero),
+                    (DayKind.PublicHoliday, WorkShare.Whole, WorkShare.None, HalfDays.Zero),
+                    (DayKind.PublicHoliday, WorkShare.Half, WorkShare.Half, Days(0.5m)),
+                ],
+                new[] { "2027-04-19", "2027-04-24", "2027-04-27" }
+                    .Select(halves.Status)
+                    .Select(status => (status.Kind, status.PublicHolidayShare, status.Share, status.Counted)));
+        });
+
         rule.Check("of several public holidays that count on one date, the largest share is taken: SO 01.05.2026 with its half and its whole entry ticked leaves none", () =>
         {
             var both = new PlanScenario(Settings(2026, canton: Canton.SO)).Loaded(solothurn);

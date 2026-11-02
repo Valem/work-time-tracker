@@ -45,8 +45,15 @@ public sealed record DayStatus(
 {
     public bool Bookable => Share != WorkShare.None;
 
-    /// <summary>The share of the public holidays that count on the date — a half or a whole public holiday — none when none counts.</summary>
-    public WorkShare PublicHolidayShare => Holiday?.Takes ?? WorkShare.None;
+    /// <summary>
+    /// The share the public holidays that count on the date show as — a half or a whole public holiday — none when none
+    /// counts. A half one shows as half only beside half a day's work; where no work share is left — on a weekend, a free
+    /// weekday — it shows whole. What a booking counts follows <see cref="Share"/> alone.
+    /// </summary>
+    public WorkShare PublicHolidayShare =>
+        (Holiday?.Takes ?? WorkShare.None) == WorkShare.None ? WorkShare.None
+        : Share == WorkShare.None ? WorkShare.Whole
+        : WorkShare.Half;
 
     /// <summary>The public holidays that count on the date, whose names it shows.</summary>
     public IReadOnlyList<PublicHolidayEntry> CountingHolidays => Holiday?.Counting ?? [];
