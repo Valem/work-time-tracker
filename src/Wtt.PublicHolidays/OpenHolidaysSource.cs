@@ -72,13 +72,17 @@ public sealed class OpenHolidaysSource(TimeProvider clock) : IPublicHolidaySourc
         return request;
     }
 
-    /// <summary>No credentials for the server or a proxy, no cookies, no tracing headers, no redirects, no decompression.</summary>
+    /// <summary>
+    /// No credentials for the server or a proxy, no cookies, no tracing headers, no redirects, no decompression. The system
+    /// proxy goes in wrapped, because the handler's null proxy credentials do not cover those the proxy carries itself.
+    /// </summary>
     private static SocketsHttpHandler Handler() => new()
     {
         AllowAutoRedirect = false,
         AutomaticDecompression = DecompressionMethods.None,
         UseCookies = false,
         UseProxy = true,
+        Proxy = new UncredentialedProxy(HttpClient.DefaultProxy),
         Credentials = null,
         DefaultProxyCredentials = null,
         PreAuthenticate = false,
