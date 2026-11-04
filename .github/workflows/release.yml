@@ -1,0 +1,151 @@
+name: release
+
+# A version tag (v1.2.3) builds and publishes a GitHub Release: the per-user installer, the developer CLI and
+# their SHA-256 hashes (ADR-005). The winget manifest for that version is kept as a workflow artifact for the
+# owner to submit from their own account (ADR-002); nothing here writes to winget-pkgs.
+# Run by hand (workflow_dispatch) it is a dry run: the same build, verify included, with every file kept as a
+# workflow artifact and no release.
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, e.g. 0.5.0 (dry run: nothing is released)'
+        required: true
+        default: '0.0.0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE_IDENTIFIER: Valem.WorkTimeTracker
+  INNO_SETUP_VERSION: 6.7.1
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Version
+        id: version
+        shell: pwsh
+        env:
+          REQUESTED: ${{ github.event_name == 'push' && github.ref_name || format('v{0}', inputs.version) }}
+        run: |
+          if (-not ($env:REQUESTED -match '^v(\d+\.\d+\.\d+)$')) {
+            throw "Not a release version: '$env:REQUESTED' (expected v<major>.<minor>.<patch>)"
+          }
+          "version=$($Matches[1])" >> $env:GITHUB_OUTPUT
+          "tag=$env:REQUESTED" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: src/ui/.nvmrc
+
+      - name: Verify
+        shell: pwsh
+        run: ./tools/verify.ps1
+
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --version $env:INNO_SETUP_VERSION --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup $env:INNO_SETUP_VERSION could not be installed" }
+          }
+          if (-not (Test-Path $compiler)) { throw "No Inno Setup compiler at $compiler" }
+          "Inno Setup $((Get-Item $compiler).VersionInfo.ProductVersion): $compiler"
+
+      - name: App, Recorder and installer
+        shell: pwsh
+        run: ./tools/run.ps1 -Installer -Version ${{ steps.version.outputs.version }}
+
+      - name: Developer CLI
+        shell: pwsh
+        run: |
+          dotnet publish src/Wtt.Cli --configuration Release --runtime win-x64 `
+            -p:Version=${{ steps.version.outputs.version }} --output artifacts/cli --nologo
+          if ($LASTEXITCODE -ne 0) { throw "CLI publish failed (exit code $LASTEXITCODE)" }
+
+      - name: Release files and hashes
+        shell: pwsh
+        run: |
+          $release = New-Item -ItemType Directory -Force -Path artifacts/release
+          Copy-Item artifacts/installer/wtt-setup.exe, artifacts/cli/wtt-cli.exe -Destination $release
+          $sums = Get-ChildItem $release -Filter *.exe | Sort-Object Name | ForEach-Object {
+            "$((Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant())  $($_.Name)"
+          }
+          Set-Content -LiteralPath (Join-Path $release 'SHA256SUMS.txt') -Value $sums -Encoding utf8NoBOM
+          $sums
+
+      - name: winget manifest
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.version.outputs.tag }}'
+          ./installer/winget/New-WingetManifest.ps1 `
+            -Version ${{ steps.version.outputs.version }} `
+            -PackageIdentifier $env:PACKAGE_IDENTIFIER `
+            -InstallerPath artifacts/release/wtt-setup.exe `
+            -InstallerUrl "https://github.com/${{ github.repository }}/releases/download/$tag/wtt-setup.exe" `
+            -OutputDirectory artifacts/winget `
+            -SkipValidate
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-files
+          path: artifacts/release/
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: winget-manifest
+          path: artifacts/winget/
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: release-files
+          path: release
+
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.build.outputs.tag }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          {
+            echo "Work Time Tracker $VERSION."
+            echo
+            echo "Install: \`winget install $PACKAGE_IDENTIFIER\` (once the listing is merged), or run \`wtt-setup.exe\`."
+            echo "\`wtt-cli.exe\` is the developer CLI; it is not installed."
+            echo
+            echo "SHA-256:"
+            echo '```text'
+            cat release/SHA256SUMS.txt
+            echo '```'
+          } > notes.md
+          gh release create "$TAG" release/wtt-setup.exe release/wtt-cli.exe release/SHA256SUMS.txt \
+            --verify-tag --title "Work Time Tracker $VERSION" --notes-file notes.md

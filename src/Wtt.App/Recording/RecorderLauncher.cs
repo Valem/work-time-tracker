@@ -25,7 +25,7 @@ internal sealed class RecorderLauncher(
     ErrorLog log)
 {
     public const string ExecutableName = "wtt-recorder.exe";
-    public const string DataFolderOption = "--data-dir";
+    public const string DataFolderOption = "--data";
 
     public static RecorderLauncher ForThisSession(string programFolder, string? dataFolder, ErrorLog log)
     {

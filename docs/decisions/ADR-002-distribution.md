@@ -26,10 +26,10 @@ every sign-in, without admin rights.
   creates each person's data folder at first start. Uninstalling in this mode cannot remove other
   users' data folders, so 001 K3 holds only partly there.
 - **Channel:** the installer is attached to a **GitHub Release** of the public repository (ADR-005) and
-  listed in **winget's community repository** (`microsoft/winget-pkgs`): `winget install <id>`,
-  updates by `winget upgrade`. The app contains **no update code**; its only network code is the
-  public-holiday request (ADR-007), sent by the App host — and the developer CLI's `holidays` command, run
-  by hand, sends the same request.
+  listed in **winget's community repository** (`microsoft/winget-pkgs`) as `Valem.WorkTimeTracker` (MIT):
+  `winget install Valem.WorkTimeTracker`, updates by `winget upgrade`. The app contains **no update code**; its
+  only network code is the public-holiday request (ADR-007), sent by the App host — and the developer CLI's
+  `holidays` command, run by hand, sends the same request.
 - **Recorder autostart:** a per-user `Run` value under `HKCU\…\CurrentVersion\Run`, written by the
   installer and removed by the uninstaller; visible and switchable in Settings → Apps → Startup. The
   App starts the Recorder when it finds it stopped.

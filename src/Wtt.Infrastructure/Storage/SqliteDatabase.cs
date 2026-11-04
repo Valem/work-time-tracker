@@ -5,8 +5,10 @@ using Wtt.Domain.Time;
 namespace Wtt.Infrastructure.Storage;
 
 /// <summary>
-/// The one data file (ADR-004). Opening it applies any pending forward-only migration under SQLite's
-/// write lock, so whichever process opens it first migrates it.
+/// The one data file (ADR-004). <see cref="Open"/> applies any pending forward-only migration under SQLite's
+/// write lock; the Recorder opens it so at its start. A program reading beside a running Recorder opens it
+/// with <see cref="TryOpenCurrent"/> and leaves migrating to that Recorder, so an older Recorder never runs on
+/// a schema it does not know.
 /// </summary>
 public sealed class SqliteDatabase
 {

@@ -54,16 +54,37 @@ public sealed class SqliteFactJournal(SqliteDatabase database) : IFactJournal
         using var reader = query.ExecuteReader();
         while (reader.Read())
         {
-            var source = Enum.Parse<FactSource>(reader.GetString(3));
+            if (!TryName<FactKind>(reader.GetString(2), out var kind) || !TryName<FactSource>(reader.GetString(3), out var source))
+            {
+                continue;
+            }
+
             facts.Add(new ActivityFact(
                 Instant(reader.GetInt64(0), reader.GetInt32(1)),
-                Enum.Parse<FactKind>(reader.GetString(2)),
+                kind,
                 source,
                 reader.GetString(4),
                 StandbyReasons.NamedOnRead(source, StoredJson.DecodeDetail(reader.GetString(5)))));
         }
 
         return Task.FromResult<IReadOnlyList<ActivityFact>>(facts);
+    }
+
+    /// <summary>
+    /// A kind or source a newer version wrote is unknown here, and its fact is left out of every read: this
+    /// version cannot say what it means for use, and one such fact must not stop every day from being read.
+    /// </summary>
+    private static bool TryName<TEnum>(string stored, out TEnum value)
+        where TEnum : struct, Enum
+    {
+        value = default;
+        if (!Enum.GetNames<TEnum>().Contains(stored, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        value = Enum.Parse<TEnum>(stored);
+        return true;
     }
 
     public Task<DateTimeOffset?> EarliestAsync(FactSource? source = null)

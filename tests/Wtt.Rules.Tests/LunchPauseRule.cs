@@ -6,7 +6,7 @@ namespace Wtt.Rules.Tests;
 public sealed class LunchPauseRule
 {
     [Fact]
-    public void BR_007_the_longest_pause_touching_the_lunch_window_is_deducted_whole()
+    public void BR_007_the_longest_pause_starting_inside_the_lunch_window_is_deducted_whole()
     {
         var rule = new RuleScenarios();
 
@@ -42,40 +42,67 @@ public sealed class LunchPauseRule
             Assert.Equal(Hm("8:08"), workday.Total);
         });
 
-        rule.Check("of two pauses touching the window the longest is the lunch pause", () =>
+        rule.Check("of two pauses starting inside the window the longest is the lunch pause", () =>
         {
             var day = new Scenario()
-                .Use("2026-10-20 08:00", "2026-10-20 11:50")
-                .Use("2026-10-20 12:10", "2026-10-20 12:30")
-                .Use("2026-10-20 13:05", "2026-10-20 17:00");
+                .Use("2026-10-20 08:00", "2026-10-20 12:10")
+                .Use("2026-10-20 12:30", "2026-10-20 12:50")
+                .Use("2026-10-20 13:25", "2026-10-20 17:00");
             var workday = day.Day("2026-10-20", Example);
-            Assert.Equal(day.At("2026-10-20 12:30"), workday.Lunch.Pause?.Start);
+            Assert.Equal(day.At("2026-10-20 12:50"), workday.Lunch.Pause?.Start);
             Assert.Equal(Hm("0:35"), workday.Break);
             Assert.Equal(Hm("8:25"), workday.Total);
         });
 
-        rule.Check("a pause crossing the window's opening touches it and is deducted whole", () =>
+        rule.Check("a longer morning pause running into the window is work; the later lunch is deducted whole, also past the window's end", () =>
         {
-            var workday = new Scenario()
-                .Use("2026-10-20 08:00", "2026-10-20 11:50")
-                .Use("2026-10-20 12:40", "2026-10-20 17:00")
-                .Day("2026-10-20", Example);
-            Assert.Equal(Hm("0:50"), workday.Break);
+            var day = new Scenario()
+                .Use("2026-10-20 08:00", "2026-10-20 10:30")
+                .Use("2026-10-20 12:20", "2026-10-20 12:50")
+                .Use("2026-10-20 13:35", "2026-10-20 17:00");
+            var workday = day.Day("2026-10-20", Example);
+            Assert.Equal(day.At("2026-10-20 12:50"), workday.Lunch.Pause?.Start);
+            Assert.Equal(day.At("2026-10-20 13:35"), workday.Lunch.Pause?.End);
             Assert.Equal(LunchBasis.PauseWhole, workday.Lunch.Basis);
-            Assert.Equal(Hm("8:10"), workday.Total);
+            Assert.Equal(Hm("0:45"), workday.Break);
+            Assert.Equal(Hm("8:15"), workday.Total);
         });
 
-        rule.Check("a pause ending exactly when the window opens touches it", () =>
+        rule.Check("a pause ending exactly when the window opens is not the lunch pause; the tier minimum is deducted", () =>
         {
             var workday = new Scenario()
                 .Use("2026-10-20 08:00", "2026-10-20 11:15")
                 .Use("2026-10-20 12:00", "2026-10-20 17:00")
                 .Day("2026-10-20", Example);
-            Assert.Equal(Hm("0:45"), workday.Break);
-            Assert.Equal(LunchBasis.PauseWhole, workday.Lunch.Basis);
+            Assert.Null(workday.Lunch.Pause);
+            Assert.Equal(LunchBasis.TierMinimum, workday.Lunch.Basis);
+            Assert.Equal(Hm("0:30"), workday.Break);
+            Assert.Equal(Hm("8:30"), workday.Total);
         });
 
-        rule.Check("a pause starting exactly when the window closes touches it", () =>
+        rule.Check("a pause starting 20 seconds before the window opens is not the lunch pause", () =>
+        {
+            var workday = new Scenario()
+                .Use("2026-10-20 08:00", "2026-10-20 11:59:40")
+                .Use("2026-10-20 12:40", "2026-10-20 17:00")
+                .Day("2026-10-20", Example);
+            Assert.Null(workday.Lunch.Pause);
+            Assert.Equal(Hm("0:30"), workday.Break);
+            Assert.Equal(Hm("8:30"), workday.Total);
+        });
+
+        rule.Check("a pause starting the instant the window opens starts inside it", () =>
+        {
+            var day = new Scenario()
+                .Use("2026-10-20 08:00", "2026-10-20 12:00:00")
+                .Use("2026-10-20 12:40", "2026-10-20 17:00");
+            var workday = day.Day("2026-10-20", Example);
+            Assert.Equal(day.At("2026-10-20 12:00"), workday.Lunch.Pause?.Start);
+            Assert.Equal(Hm("0:40"), workday.Break);
+            Assert.Equal(Hm("8:20"), workday.Total);
+        });
+
+        rule.Check("a pause starting exactly when the window closes starts inside it", () =>
         {
             var workday = new Scenario()
                 .Use("2026-10-20 08:00", "2026-10-20 13:30")
@@ -83,6 +110,29 @@ public sealed class LunchPauseRule
                 .Day("2026-10-20", Example);
             Assert.Equal(Hm("0:40"), workday.Break);
             Assert.Equal(LunchBasis.PauseWhole, workday.Lunch.Basis);
+        });
+
+        rule.Check("a pause starting within the window's closing minute starts inside it", () =>
+        {
+            var day = new Scenario()
+                .Use("2026-10-20 08:00", "2026-10-20 13:30:40")
+                .Use("2026-10-20 14:20:40", "2026-10-20 17:00");
+            var workday = day.Day("2026-10-20", Example);
+            Assert.Equal(day.At("2026-10-20 13:31"), workday.Lunch.Pause?.Start);
+            Assert.Equal(LunchBasis.PauseWhole, workday.Lunch.Basis);
+            Assert.Equal(Hm("0:50"), workday.Break);
+            Assert.Equal(Hm("8:10"), workday.Total);
+        });
+
+        rule.Check("a pause starting a minute after the window closes is not the lunch pause", () =>
+        {
+            var workday = new Scenario()
+                .Use("2026-10-20 08:00", "2026-10-20 13:31:00")
+                .Use("2026-10-20 14:30", "2026-10-20 17:00")
+                .Day("2026-10-20", Example);
+            Assert.Null(workday.Lunch.Pause);
+            Assert.Equal(Hm("0:30"), workday.Break);
+            Assert.Equal(Hm("8:30"), workday.Total);
         });
 
         rule.Check("the night pause is never the lunch pause, even when it reaches into the window", () =>

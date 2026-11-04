@@ -30,9 +30,9 @@ public sealed class WorkdayCalculator : IWorkdayCalculator
         var start = carriedIn ? Midnight(date, today[0].Start.Offset) : today[0].Start;
         var lastUseEnd = carriedOut ? Midnight(date.AddDays(1), next!.Start.Offset) : today[^1].End;
 
-        var pauses = PausesBetween(today, presence.Pauses);
+        var (pauses, startedAt) = PausesBetween(today, presence.Pauses);
         var nightPause = carriedIn ? NightPause(date, pauses, rule) : null;
-        var lunchPause = LunchPause(date, pauses.Where(pause => !ReferenceEquals(pause, nightPause)), rule);
+        var lunchPause = LunchPause(date, pauses.Where(pause => !ReferenceEquals(pause, nightPause)), startedAt, rule);
         var eveningPause = EveningPause(date, pauses, nightPause, lunchPause, rule);
 
         var end = eveningPause?.Start ?? lastUseEnd;
@@ -58,21 +58,27 @@ public sealed class WorkdayCalculator : IWorkdayCalculator
     private static DateTimeOffset Midnight(DateOnly date, TimeSpan offset) =>
         new(date.ToDateTime(TimeOnly.MinValue), offset);
 
-    private static List<Pause> PausesBetween(IReadOnlyList<DayPiece> pieces, IReadOnlyList<Pause> presencePauses)
+    /// <summary>The pauses between the day's pieces, each with the instant it actually started, before rounding.</summary>
+    private static (List<Pause> Pauses, IReadOnlyDictionary<Pause, DateTimeOffset> StartedAt) PausesBetween(
+        IReadOnlyList<DayPiece> pieces,
+        IReadOnlyList<Pause> presencePauses)
     {
         var ignoredWakes = presencePauses.SelectMany(pause => pause.IgnoredWakes).ToList();
         var pauses = new List<Pause>();
+        var startedAt = new Dictionary<Pause, DateTimeOffset>(ReferenceEqualityComparer.Instance);
         for (var i = 1; i < pieces.Count; i++)
         {
             var start = pieces[i - 1].End;
             var end = pieces[i].Start;
             if (end > start)
             {
-                pauses.Add(new Pause(start, end, ignoredWakes.Where(wake => wake >= start && wake <= end).ToList()));
+                var pause = new Pause(start, end, ignoredWakes.Where(wake => wake >= start && wake <= end).ToList());
+                pauses.Add(pause);
+                startedAt[pause] = pieces[i - 1].EndedAt;
             }
         }
 
-        return pauses;
+        return (pauses, startedAt);
     }
 
     /// <summary>
@@ -86,12 +92,22 @@ public sealed class WorkdayCalculator : IWorkdayCalculator
             ?? Longest(pauses.Where(pause => pause.Start.DateTime < windowOpens));
     }
 
-    /// <summary>The longest pause touching the lunch window.</summary>
-    private static Pause? LunchPause(DateOnly date, IEnumerable<Pause> pauses, LunchRule rule)
+    /// <summary>
+    /// The longest pause starting inside the lunch window, judged by the clock minute it actually started in, before
+    /// the day is rounded to whole minutes: the opening minute through the closing minute, so a pause starting at
+    /// 13:30:40 starts inside a window closing at 13:30 and one starting at 11:59:40 not inside one opening at 12:00.
+    /// Where it ends does not matter, so a morning pause running into the window is work.
+    /// </summary>
+    private static Pause? LunchPause(
+        DateOnly date,
+        IEnumerable<Pause> pauses,
+        IReadOnlyDictionary<Pause, DateTimeOffset> startedAt,
+        LunchRule rule)
     {
         var windowOpens = date.ToDateTime(rule.Window.Start);
-        var windowCloses = date.ToDateTime(rule.Window.End);
-        return Longest(pauses.Where(pause => pause.Start.DateTime <= windowCloses && pause.End.DateTime >= windowOpens));
+        var afterClosingMinute = date.ToDateTime(rule.Window.End).AddMinutes(1);
+        return Longest(pauses.Where(pause =>
+            startedAt[pause].DateTime >= windowOpens && startedAt[pause].DateTime < afterClosingMinute));
     }
 
     /// <summary>
