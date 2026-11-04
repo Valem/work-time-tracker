@@ -1,2 +1,3 @@
 # Binary files tools/check-hygiene.ps1 may not read as text, one repository path per line (as git ls-files prints it).
 # A file belongs here only after its content has been checked by hand for usage and personal data.
+assets/icon/wtt.ico

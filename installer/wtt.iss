@@ -54,6 +54,7 @@ CloseApplications=yes
 RestartApplications=no
 UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\{#AppExe}
+SetupIconFile=..\assets\icon\wtt.ico
 OutputDir={#OutputDir}
 OutputBaseFilename=wtt-setup
 Compression=lzma2/max
@@ -68,7 +69,7 @@ Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Type: filesandordirs; Name: "{app}\wwwroot"
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\{#AppExe}"
 
 [Registry]
 ; HKA is HKCU in a per-user install and HKLM in the per-machine fallback.

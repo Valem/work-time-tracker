@@ -6,6 +6,7 @@
     <AssemblyName>wtt-recorder</AssemblyName>
     <RootNamespace>Wtt.Recorder</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationIcon>..\..\assets\icon\wtt.ico</ApplicationIcon>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">

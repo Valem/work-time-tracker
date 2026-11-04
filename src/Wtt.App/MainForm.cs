@@ -29,10 +29,18 @@ internal sealed class MainForm : Form
         this.bridge = bridge;
         this.data = data;
         Text = "Work Time Tracker";
+        Icon = LoadIcon();
         ClientSize = new Size(1100, 720);
         MinimumSize = new Size(640, 480);
         StartPosition = FormStartPosition.CenterScreen;
         Controls.Add(view);
+    }
+
+    private static Icon LoadIcon()
+    {
+        using var stream = typeof(MainForm).Assembly.GetManifestResourceStream("wtt.ico")
+            ?? throw new InvalidOperationException("The embedded window icon is missing.");
+        return new Icon(stream);
     }
 
     protected override async void OnLoad(EventArgs e)
