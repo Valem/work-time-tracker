@@ -73,8 +73,7 @@ public sealed class OpenHolidaysSource(TimeProvider clock) : IPublicHolidaySourc
     }
 
     /// <summary>
-    /// No credentials for the server or a proxy, no cookies, no tracing headers, no redirects, no decompression. The system
-    /// proxy goes in wrapped, because the handler's null proxy credentials do not cover those the proxy carries itself.
+    /// No credentials for the server or a proxy, no cookies, no tracing headers, no redirects, no decompression.
     /// </summary>
     private static SocketsHttpHandler Handler() => new()
     {
@@ -82,7 +81,7 @@ public sealed class OpenHolidaysSource(TimeProvider clock) : IPublicHolidaySourc
         AutomaticDecompression = DecompressionMethods.None,
         UseCookies = false,
         UseProxy = true,
-        Proxy = new UncredentialedProxy(HttpClient.DefaultProxy),
+        Proxy = SystemProxyWithoutCredentials(),
         Credentials = null,
         DefaultProxyCredentials = null,
         PreAuthenticate = false,
@@ -90,6 +89,15 @@ public sealed class OpenHolidaysSource(TimeProvider clock) : IPublicHolidaySourc
         ConnectTimeout = AnswerWithin,
         SslOptions = { CertificateRevocationCheckMode = X509RevocationMode.NoCheck },
     };
+
+    /// <summary>
+    /// The handler's null proxy credentials do not cover those the system proxy carries itself — the user and password of
+    /// <c>HTTPS_PROXY=http://user:pass@host:port</c> — so such a proxy goes in wrapped without them. A proxy carrying none,
+    /// as Windows' own settings and PAC give it, is left to the handler (null): wrapping it would hide its fallback from one
+    /// listed proxy to the next.
+    /// </summary>
+    private static UncredentialedProxy? SystemProxyWithoutCredentials() =>
+        HttpClient.DefaultProxy is { Credentials: not null } system ? new UncredentialedProxy(system) : null;
 
     private static void RequireTakeable(HttpResponseMessage response)
     {
