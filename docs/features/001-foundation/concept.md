@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.6.4 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.2 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
+**Version:** v1.6.5 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.2 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
 
 ## 1. Executive Context
 
@@ -111,6 +111,7 @@ classDiagram
     Duration total
     Precision precision
     List~DateTimeOffset~ windowsWakes
+    pausesNotWorked() List~Pause~
     workSpans() List~WorkBlock~
   }
   ActivityFact "*" --> "1" PresenceTimeline : built into
@@ -125,8 +126,9 @@ LastInput, IdleTimeout · `FactSource` = Live, WinlogonHistory, SystemHistory ·
 session), stored as JSON · `CoverageSpan` (from, to) · `WorkWeek` (monday, days, total) · `UseSpan` (start, end, precision) · `Pause`
 (start, end, the ignored wakes inside it) · `WorkBlock` (start, end) · `BreakTier` (over, minimum) · `LunchDeduction` (pause, deducted, basis).\
 **Workday:** `blocks` run from start to end, split only at the night pause; `pauses` are every pause between its uses; `windowsWakes` are the wakes Windows did
-alone (BR-002) on its local date, inside a pause or not. `workSpans` are the blocks minus the pauses drawn over them — the day bar's plain work segments, never the
-work time: a pause counted as work (BR-005) and the evening use (BR-012) are work yet lie in no work span; `total` (attendance − break) is the work time.\
+alone (BR-002) on its local date, inside a pause or not. `pausesNotWorked` are the night, lunch and evening pause; `workSpans` are the blocks minus them, so a
+pause counted as work (BR-005) lies inside a span (P2) — the day bar's work, never the work time: the evening use (BR-012) lies in no span and the break may
+exceed the lunch pause; `total` (attendance − break) is the work time.\
 **Invariants:** the fact journal is append-only and deduplicated by `sourceKey`; only the Recorder writes live facts; stored facts are never rewritten.
 Infrastructure names a reason from its stored raw reason with the current mapping when facts are read (ADR-004), so a reason named later (fingerprint)
 reaches facts already stored; domain rules decide on reason names only, and the raw reason passes through the domain unread; a name or cause it does not know reads as unknown, never as an error, and a fact of a kind or source it does not know (written by a newer version) is left out of every read. Lunch rules are superseded, never edited. Workdays
@@ -245,7 +247,7 @@ sequenceDiagram
 ```text
 week.get        { monday? }        → ISO week (year, number), previous and next Monday (null at the oldest kept fact's week and at the current week),
                                      7 days (date, start, end, break, total, rebuilt) + week total; no monday: the current week
-day.get         { date }           → the date, its week's Monday, start, end, work spans, pauses each with its role (work, lunch, night, evening),
+day.get         { date }           → the date, its week's Monday, start, end, work spans, the pauses that are no work each with its role (lunch, night, evening),
                                      Windows' own wakes on that date, night pause, lunch pause + deducted + basis, evening pause + evening use, break, total, rebuilt
 status.get      { }                → recording (this session's Recorder holds its mutex and coverage reached within 2 min),
                                      last recorded as date and minutes at the laptop's current offset
@@ -260,7 +262,7 @@ any request     { id, type, payload } → { id, result } or { id, error: { code 
   and writes their TypeScript declarations into `src/ui` (ADR-006); the UI type check compiles against them, so a field or code renamed, removed or retyped in C# fails verify.
 - **Values:** dates cross as `yyyy-MM-dd` with their ISO weekday, times as minutes from that day's midnight at the offset stored with each fact (1440 = 24:00),
   durations as whole minutes. The host supplies navigation and calendars — previous and next, weekdays, week numbers, the current offset — so the UI never
-  steps a date or reads a clock; it only places and formats values. A day's work spans are `Workday.WorkSpans`: the bar's plain work segments, never summed as work time (§3).
+  steps a date or reads a clock; it only places and formats values. A day's work spans are `Workday.WorkSpans`, its pauses `Workday.PausesNotWorked`: what the bar draws, never summed as work time (§3).
 - **Text and formats (NFR-005):** one place in the host decides the active locale — de-CH, the only one in 001 — sets the host's UI culture from it and passes
   its name in the start page's address. The UI looks that name up in a registry of locales, each a language's texts (every screen text, the weekday names, one
   per refusal code) joined with a region's formats (date, week, time, duration, and reading a typed time or duration back into minutes), typed so that a locale
@@ -383,7 +385,7 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 **Milestone:** M2 — on the target laptop the owner builds and installs the local build and uses it for a working week: `pwsh tools/run.ps1 -Installer`, then `.\artifacts\installer\wtt-setup.exe /VERYSILENT /CURRENTUSER`. Phase-4 waits until they have.\
 **Scope:** one window in German with Swiss formats, every text and format from the de-CH locale (NFR-005), the recording status always in view (whether it records and when it last recorded, or since when it has stopped);\
 week — Monday–Sunday rows with start, end (24:00 past midnight), break, total and rebuilt mark, the week total, previous and next week as the host supplies them from the oldest kept fact's week to the current one, opening on the current week;\
-day, opened from its row — a 00:00–24:00 timeline of work and pauses with the Windows wakes ignored on that date, the night pause, the lunch pause with what was deducted and whether the tier raised it (A1), the evening pause and the minutes after it (E2); its legend lists the kinds that occur that day, each with the start and end of each of its spans (L1), and the explanation of the day stays closed until the person opens it;\
+day, opened from its row — a 00:00–24:00 timeline of work in whole blocks — a pause counted as work shows as work, never as a kind of its own (P2) — with the Windows wakes ignored on that date, the night pause, the lunch pause with what was deducted and whether the tier raised it (A1), the evening pause and the minutes after it (E2); its legend lists the kinds that occur that day, each with the start and end of each of its spans (L1), and the explanation of the day stays closed until the person opens it;\
 settings — lunch window and tiers (add, remove), prefilled until the first save (P1), a save showing the date it applies from (K4), an invalid entry refused with its reason (V1);\
 the bridge (§5); web-view lockdown and local crash reports (ADR-006), web messages enabled for the app's own origin only, a crashed renderer replaced by a message asking to restart the app (R1);\
 a data file that cannot be opened (newer, damaged, locked) or fails while the app runs, shown in place of the page as a problem naming the error log's path (D1).\
@@ -444,4 +446,5 @@ a data file that cannot be opened (newer, damaged, locked) or fails while the ap
 | V1 | Invalid lunch settings are refused with their reason; nothing is saved | A wrong entry needs an answer, not a silent failure | Phase-3 readiness | Keep (owner) |
 | R1 | The window reloads the app after its renderer crashed | Otherwise the window stays blank | Phase-3 readiness | Cut (owner): a message asks to restart the app |
 | D1 | A data file that cannot be opened (newer, damaged, locked) or fails while the app runs shows as a problem naming the error log's path, e.g. «Details: %LocalAppData%\WorkTimeTracker\errors.log» | The person sees why nothing shows and where the details are | Phase-3 design review | Keep (owner) |
-| L1 | The day's legend lists only the kinds that occur that day | Once the legend carries times, a kind with none is noise | Phase-3 owner feedback | Keep (owner) |
+| L1 | The day's legend lists only the kinds that occur that day; a pause counted as work is no kind (P2) | Once the legend carries times, a kind with none is noise | Phase-3 owner feedback | Keep (owner) |
+| P2 | The day view shows a pause counted as work as its own kind (legend, bar, explanation) | Mostly idle locks while reading or in meetings; listing them is noise — work shows in whole blocks around lunch, night and evening, totals unchanged | Phase-3 owner feedback | Cut (owner) |

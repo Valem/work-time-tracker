@@ -23,7 +23,7 @@ internal static class Views
         day.Start is { } start ? MinutesOn(start, day.Date) : null,
         day.End is { } end ? MinutesOn(end, day.Date) : null,
         day.WorkSpans.Select(span => Span(span.Start, span.End, day.Date)).ToList(),
-        day.Pauses.Select(pause => Pause(pause, RoleOf(pause, day), day.Date)).ToList(),
+        day.PausesNotWorked.Select(pause => Pause(pause, RoleOf(pause, day), day.Date)).ToList(),
         day.WindowsWakes.Select(wake => MinutesOn(wake, day.Date)).ToList(),
         SpanOf(day.NightPause, day.Date),
         new LunchView(SpanOf(day.Lunch.Pause, day.Date), Minutes(day.Lunch.Deducted), BasisOf(day.Lunch.Basis)),
@@ -56,7 +56,7 @@ internal static class Views
         ReferenceEquals(pause, day.NightPause) ? PauseRole.Night
         : ReferenceEquals(pause, day.Lunch.Pause) ? PauseRole.Lunch
         : ReferenceEquals(pause, day.EveningPause) ? PauseRole.Evening
-        : PauseRole.Work;
+        : throw new ArgumentException("A pause counted as work has no role in the day view.", nameof(pause));
 
     private static DaySpan? SpanOf(Pause? pause, DateOnly date) => pause is null ? null : Span(pause.Start, pause.End, date);
 

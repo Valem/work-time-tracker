@@ -422,10 +422,6 @@ main[data-wide] {
   background: var(--work-soft);
 }
 
-.segment.pause-work {
-  background: repeating-linear-gradient(135deg, var(--work) 0 4px, var(--work-soft) 4px 8px);
-}
-
 .segment.pause-lunch {
   background: var(--lunch);
 }
@@ -497,10 +493,6 @@ main[data-wide] {
 
 .legend-work::before {
   background: var(--work);
-}
-
-.legend-pause-work::before {
-  background: repeating-linear-gradient(135deg, var(--work) 0 3px, var(--work-soft) 3px 6px);
 }
 
 .legend-pause-lunch::before {
