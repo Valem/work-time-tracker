@@ -3,8 +3,11 @@ using Wtt.Domain.Time;
 
 namespace Wtt.Domain.Workdays;
 
-/// <summary>The part of a use span that falls on one local date, at whole-minute precision.</summary>
-internal sealed record DayPiece(DateOnly Date, DateTimeOffset Start, DateTimeOffset End, Precision Precision)
+/// <summary>
+/// The part of a use span that falls on one local date, at whole-minute precision; <paramref name="EndedAt"/> is when
+/// it actually ended — the use's own end, unrounded, or the midnight it was split at.
+/// </summary>
+internal sealed record DayPiece(DateOnly Date, DateTimeOffset Start, DateTimeOffset End, Precision Precision, DateTimeOffset EndedAt)
 {
     private static readonly TimeSpan ClockChangeFrom = TimeSpan.FromHours(2);
     private static readonly TimeSpan ClockChangeUntil = TimeSpan.FromHours(3);
@@ -20,11 +23,11 @@ internal sealed record DayPiece(DateOnly Date, DateTimeOffset Start, DateTimeOff
             var start = spanStart;
             for (var midnight = MidnightAfter(start, spanStart, end.Offset); end > midnight; midnight = MidnightAfter(start, spanStart, end.Offset))
             {
-                pieces.Add(new DayPiece(start.LocalDate(), start, midnight, use.Precision));
+                pieces.Add(new DayPiece(start.LocalDate(), start, midnight, use.Precision, midnight));
                 start = midnight;
             }
 
-            pieces.Add(new DayPiece(start.LocalDate(), start, end, use.Precision));
+            pieces.Add(new DayPiece(start.LocalDate(), start, end, use.Precision, use.End));
         }
 
         return pieces;

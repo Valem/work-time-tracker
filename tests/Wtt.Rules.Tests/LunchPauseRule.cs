@@ -80,6 +80,28 @@ public sealed class LunchPauseRule
             Assert.Equal(Hm("8:30"), workday.Total);
         });
 
+        rule.Check("a pause starting 20 seconds before the window opens is not the lunch pause", () =>
+        {
+            var workday = new Scenario()
+                .Use("2026-10-20 08:00", "2026-10-20 11:59:40")
+                .Use("2026-10-20 12:40", "2026-10-20 17:00")
+                .Day("2026-10-20", Example);
+            Assert.Null(workday.Lunch.Pause);
+            Assert.Equal(Hm("0:30"), workday.Break);
+            Assert.Equal(Hm("8:30"), workday.Total);
+        });
+
+        rule.Check("a pause starting the instant the window opens starts inside it", () =>
+        {
+            var day = new Scenario()
+                .Use("2026-10-20 08:00", "2026-10-20 12:00:00")
+                .Use("2026-10-20 12:40", "2026-10-20 17:00");
+            var workday = day.Day("2026-10-20", Example);
+            Assert.Equal(day.At("2026-10-20 12:00"), workday.Lunch.Pause?.Start);
+            Assert.Equal(Hm("0:40"), workday.Break);
+            Assert.Equal(Hm("8:20"), workday.Total);
+        });
+
         rule.Check("a pause starting exactly when the window closes starts inside it", () =>
         {
             var workday = new Scenario()
@@ -90,10 +112,22 @@ public sealed class LunchPauseRule
             Assert.Equal(LunchBasis.PauseWhole, workday.Lunch.Basis);
         });
 
+        rule.Check("a pause starting within the window's closing minute starts inside it", () =>
+        {
+            var day = new Scenario()
+                .Use("2026-10-20 08:00", "2026-10-20 13:30:40")
+                .Use("2026-10-20 14:20:40", "2026-10-20 17:00");
+            var workday = day.Day("2026-10-20", Example);
+            Assert.Equal(day.At("2026-10-20 13:31"), workday.Lunch.Pause?.Start);
+            Assert.Equal(LunchBasis.PauseWhole, workday.Lunch.Basis);
+            Assert.Equal(Hm("0:50"), workday.Break);
+            Assert.Equal(Hm("8:10"), workday.Total);
+        });
+
         rule.Check("a pause starting a minute after the window closes is not the lunch pause", () =>
         {
             var workday = new Scenario()
-                .Use("2026-10-20 08:00", "2026-10-20 13:31")
+                .Use("2026-10-20 08:00", "2026-10-20 13:31:00")
                 .Use("2026-10-20 14:30", "2026-10-20 17:00")
                 .Day("2026-10-20", Example);
             Assert.Null(workday.Lunch.Pause);
