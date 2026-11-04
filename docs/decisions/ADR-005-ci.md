@@ -20,11 +20,13 @@ winget manifest (ADR-002). No running cost is accepted. The repository holds no 
   are proven by live checks of the built programs, with synthetic history replayed through the
   product's own importer (`wtt-cli import-xml`) where a scenario needs one. A UI test exists only where a business rule's
   test needs the UI.
-- **Version tag:** the workflow builds the self-contained executables, the per-user installer and the
-  developer CLI, and publishes them on a GitHub Release with their SHA-256 hashes, using only the
-  workflow's own token.
-- **winget:** the owner submits the release to `microsoft/winget-pkgs` from their GitHub account
-  (`wingetcreate update --submit`); no personal token is stored in the repository.
+- **Version tag:** a `v<major>.<minor>.<patch>` tag runs `.github/workflows/release.yml`: verify, then
+  the self-contained executables, the per-user installer and the developer CLI, published on a GitHub
+  Release with their SHA-256 hashes, using only the workflow's own token. Started by hand, the same
+  workflow is a dry run: everything is built and kept as workflow artifacts, nothing is released.
+- **winget:** the release workflow writes the version's manifest as a workflow artifact; the owner
+  submits it to `microsoft/winget-pkgs` from their GitHub account (`wingetcreate submit` the first
+  time, `wingetcreate update --submit` after); no personal token is stored in the repository.
 - **Personal data never enters the repository:** committed test fixtures are synthetic event logs
   built from the observed patterns; real exports of anyone's event logs stay local, git-ignored, and
   are used only by local runs. The hygiene check (`tools/check-hygiene.ps1`) fails on a tracked
