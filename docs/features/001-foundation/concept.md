@@ -405,7 +405,7 @@ a data file that cannot be opened (newer, damaged, locked) or fails while the ap
 **Goal:** A tagged release lands on GitHub and in winget's community repository; a colleague installs it with one command and sees their days without help; upgrades keep the data.\
 **Stop point:** Release candidate installable with `winget install`.\
 **Rides along:** release workflow, winget submission, README install line.\
-**Milestone:** M3 — the owner installs the published release on the target laptop: `winget install <id>`. The done gate follows.\
+**Milestone:** M3 — the owner installs the published release on the target laptop: `winget install Valem.WorkTimeTracker`. The done gate follows.\
 **Scope:** tag-built release, winget-pkgs submission and validation, install, upgrade and uninstall from the published package.\
 **Constraints:** no update or network code in the app (ADR-002); the release is built by CI from a tag (ADR-005).\
 **References:** ADR-002 (distribution), ADR-005 (CI) · FR-001 (record use), FR-004 (day/week view), UC-001
@@ -415,7 +415,7 @@ a data file that cannot be opened (newer, damaged, locked) or fails while the ap
 | AC | Criteria | Traces To |
 |----|----------|-----------|
 | AC-4.1 | A version tag publishes installer and CLI with SHA-256 hashes on a GitHub Release; the winget-pkgs pull request passes validation and is merged | FR-001, UC-001 |
-| AC-4.2 | A colleague runs `winget install <id>` without admin rights and sees today and past days without asking anyone | FR-004, UC-001 |
+| AC-4.2 | A colleague runs `winget install Valem.WorkTimeTracker` without admin rights and sees today and past days without asking anyone | FR-004, UC-001 |
 | AC-4.3 | `winget upgrade` to a later release keeps all facts, and the Recorder runs again within 60 s | FR-001, UC-001 |
 | AC-4.4 | 5 h awake on the published build: no outbound connection from the app's process tree but NFR-001's exception | FR-001, UC-001 |
 

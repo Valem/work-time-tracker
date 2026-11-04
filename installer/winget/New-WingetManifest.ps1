@@ -4,7 +4,7 @@
     Fills the winget manifest templates for one release and, unless -SkipValidate, runs winget validate.
 
 .EXAMPLE
-    pwsh installer/winget/New-WingetManifest.ps1 -Version 0.2.0 -License MIT `
+    pwsh installer/winget/New-WingetManifest.ps1 -Version 0.2.0 `
         -InstallerPath artifacts/installer/wtt-setup.exe `
         -InstallerUrl https://github.com/Valem/work-time-tracker/releases/download/v0.2.0/wtt-setup.exe
 #>
@@ -13,7 +13,7 @@ param(
     [Parameter(Mandatory)] [string] $Version,
     [Parameter(Mandatory)] [string] $InstallerPath,
     [Parameter(Mandatory)] [string] $InstallerUrl,
-    [Parameter(Mandatory)] [string] $License,
+    [string] $License = 'MIT',
     [string] $PackageIdentifier = 'Valem.WorkTimeTracker',
     [string] $Publisher = 'Valem',
     [string] $ReleaseDate = (Get-Date -Format 'yyyy-MM-dd'),

@@ -9,6 +9,7 @@ PublisherUrl: https://github.com/Valem
 PackageName: Work Time Tracker
 PackageUrl: https://github.com/Valem/work-time-tracker
 License: __LICENSE__
+LicenseUrl: https://github.com/Valem/work-time-tracker/blob/master/LICENSE
 ShortDescription: Works out your working time per day and week from when you use your Windows laptop.
 Description: |-
   Work Time Tracker notes when you use your Windows 11 laptop and works out each workday's start, end,
