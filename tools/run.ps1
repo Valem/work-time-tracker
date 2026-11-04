@@ -120,7 +120,7 @@ function Start-Locally {
     }
     else {
         $recorder = @("`"$(Join-Path $root "src/Wtt.Recorder/$output/wtt-recorder.dll")`"")
-        if ($dataFolder) { $recorder += '--data-dir', $dataFolder }
+        if ($dataFolder) { $recorder += '--data', $dataFolder }
         Start-Process dotnet -ArgumentList $recorder -WindowStyle Hidden
         Write-Host 'Recorder started.'
     }
