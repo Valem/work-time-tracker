@@ -86,12 +86,15 @@ public sealed class WorkdayCalculator : IWorkdayCalculator
             ?? Longest(pauses.Where(pause => pause.Start.DateTime < windowOpens));
     }
 
-    /// <summary>The longest pause touching the lunch window.</summary>
+    /// <summary>
+    /// The longest pause starting inside the lunch window, its opening and closing minute included; where it
+    /// ends does not matter, so a morning pause running into the window is work.
+    /// </summary>
     private static Pause? LunchPause(DateOnly date, IEnumerable<Pause> pauses, LunchRule rule)
     {
         var windowOpens = date.ToDateTime(rule.Window.Start);
         var windowCloses = date.ToDateTime(rule.Window.End);
-        return Longest(pauses.Where(pause => pause.Start.DateTime <= windowCloses && pause.End.DateTime >= windowOpens));
+        return Longest(pauses.Where(pause => pause.Start.DateTime >= windowOpens && pause.Start.DateTime <= windowCloses));
     }
 
     /// <summary>

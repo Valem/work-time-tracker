@@ -1,6 +1,6 @@
 # Foundation — Intent Brief
 
-**Version:** v1.4.1 — approved 2026-10-27 · **Feature:** 001-foundation
+**Version:** v1.4.2 — approved 2026-11-04 · **Feature:** 001-foundation
 
 ```text
 Type:            new project (001-foundation)                                       [you]
@@ -21,9 +21,10 @@ Outcome:         1 a fresh install shows today's workday; setup is only lunch wi
                    everything in between is work except lunch; a last pause of 2 h or
                    more ends the day where it starts, and use after it adds only its
                    own minutes; Windows waking itself never counts
-                 3 lunch: the longest lock/standby pause touching the window is
-                   deducted whole, but at least the tier minimum for the day's length
-                   (person sets tiers, e.g. > 5:30 → 0:15, > 7:00 → 0:30, > 9:00 → 1:00)
+                 3 lunch: the longest lock/standby pause starting inside the window is
+                   deducted whole (also past its end), but at least the tier minimum
+                   for the day's length (person sets tiers, e.g. > 5:30 → 0:15,
+                   > 7:00 → 0:30, > 9:00 → 1:00)
                  4 week view: each day's start, end, break, total, plus the week total
                  5 on first start, past days back to what Windows still keeps appear
                  6 recording goes on across restarts and standby, untouched
@@ -59,3 +60,4 @@ Evidence:        target laptops' events and install policies → tools/wtt-check
 | 16 | The browser engine's own network checks | Allowed: WebView2's update and time checks to Microsoft; the app itself sends nothing (Phase-2 check) | you |
 | 17 | Language of the app | The app's screens are in German with Swiss formats, built so that other languages and formats can be added (open/closed); only de-CH ships | you |
 | 18 | Language of installer and listing | The installer and the winget listing stay in English; only the app is German | you |
+| 19 | Which pause is lunch (M2) | The longest pause starting inside the window; a morning pause running into the window is work | you |
