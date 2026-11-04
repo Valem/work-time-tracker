@@ -118,8 +118,6 @@ function explain(pause: PauseView, day: DayView, words: Words): string {
         : language.day.lunchWhole(span, duration);
     case 'evening':
       return language.day.eveningPause(span, duration, formats.duration(day.eveningUse?.minutes ?? 0));
-    case 'work':
-      return language.day.pauseAsWork(span, duration);
   }
 }
 
@@ -200,7 +198,6 @@ function legendOf(day: DayView, words: Words): LegendEntry[] {
   const pausesAs = (role: PauseRole): string[] => day.pauses.filter((pause) => pause.role === role).map(words.span);
   const entries: LegendEntry[] = [
     { kind: 'work', label: language.day.work, times: day.workSpans.map(words.span) },
-    { kind: 'pause-work', label: language.day.roles.work, times: pausesAs('work') },
     { kind: 'pause-lunch', label: language.day.roles.lunch, times: pausesAs('lunch') },
     { kind: 'pause-night', label: language.day.roles.night, times: pausesAs('night') },
     { kind: 'pause-evening', label: language.day.roles.evening, times: pausesAs('evening') },

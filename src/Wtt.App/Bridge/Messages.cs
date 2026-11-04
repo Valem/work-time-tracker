@@ -23,10 +23,9 @@ public sealed record DayRow(CalendarDay Day, int? Start, int? End, int Break, in
 
 public sealed record DayRequest(string Date);
 
-/// <summary>What a pause of the day is: work (inside the day, counted), the lunch, the night or the evening pause.</summary>
+/// <summary>What a pause that is no work is: the lunch, the night or the evening pause.</summary>
 public enum PauseRole
 {
-    Work,
     Lunch,
     Night,
     Evening,
@@ -45,8 +44,8 @@ public enum DeductionBasis
 public sealed record LunchView(DaySpan? Pause, int Deducted, DeductionBasis Basis);
 
 /// <summary>
-/// A day; its work spans are the domain's work blocks without the pauses inside them, and its Windows wakes are the times
-/// on this date when Windows woke alone and produced no use.
+/// A day; its work spans are the domain's work blocks without the pauses that are no work, its pauses only those — a pause
+/// counted as work shows as work — and its Windows wakes are the times on this date when Windows woke alone and produced no use.
 /// </summary>
 public sealed record DayView(
     CalendarDay Day,
