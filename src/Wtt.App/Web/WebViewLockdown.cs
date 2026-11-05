@@ -88,7 +88,7 @@ internal static class WebViewLockdown
         view.ProcessFailed += (_, e) => log.Write($"Web view process failed: {e.ProcessFailedKind}, {e.Reason}, exit code {e.ExitCode}");
     }
 
-    private static bool SameFolder(string a, string b) =>
+    internal static bool SameFolder(string a, string b) =>
         string.Equals(
             Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)),
             Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),

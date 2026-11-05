@@ -50,6 +50,10 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
   - a Content-Security-Policy of `'self'` only — no remote scripts, styles, fonts or connections; the page
     never requests the public holidays itself (ADR-007);
   - reputation checking (SmartScreen) off for the app's own pages; autofill and password saving off;
+  - network prediction (preconnect, DNS prefetch, preloading) off: the runtime preconnects to a page's host
+    as it starts navigating, below the virtual host, so the app host's name would reach the proxy or DNS [6];
+    WebView2 has no option for it, so before the runtime starts the App sets the profile's own preference
+    (`net.network_prediction_options` = 2, never) and shows no page if the runtime opens another profile;
   - the WebView2 user-data folder lives in the app's data folder (ADR-004);
   - in a release build, DevTools, the default context menu and the browser's shortcut keys are off,
     and the `WEBVIEW2_*` environment overrides are cleared before the runtime starts, which must then
@@ -82,6 +86,8 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 - If any other runtime connection cannot be eliminated by configuration, it is a **blocker for the owner**:
   the options then are a Fixed Version WebView2 runtime in the installer (~+150 MB, its own updates)
   or a native UI.
+- Network prediction is turned off through the runtime's own profile preference, not a WebView2 API: a runtime
+  that renamed it would preconnect again, which only the network measurement shows.
 - **Hard to undo:** medium — the screens are rewritten on a UI change; the core and bridge contract
   stay.
 
@@ -92,3 +98,4 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
 3. WebView2 browser flags (diagnostic use; no supported switch for background networking) — https://learn.microsoft.com/microsoft-edge/webview2/concepts/webview-features-flags
 4. WerAddExcludedApplication — https://learn.microsoft.com/en-us/windows/win32/api/werapi/nf-werapi-weraddexcludedapplication
 5. CoreWebView2EnvironmentOptions.IsCustomCrashReportingEnabled — https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2environmentoptions.iscustomcrashreportingenabled
+6. NetworkPredictionOptions (DNS prefetching, TCP and SSL preconnection, prerendering) — https://learn.microsoft.com/deployedge/microsoft-edge-policies/networkpredictionoptions

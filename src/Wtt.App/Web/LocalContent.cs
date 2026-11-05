@@ -2,7 +2,7 @@ namespace Wtt.App.Web;
 
 /// <summary>
 /// The app's pages load from the install folder through a virtual host; a reserved <c>.example</c> name is
-/// never a real site, and WebView2 resolves it without DNS.
+/// never a real site, and WebView2 serves it without DNS (see <see cref="NetworkPrediction"/>).
 /// </summary>
 internal static class LocalContent
 {

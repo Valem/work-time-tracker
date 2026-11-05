@@ -91,6 +91,7 @@ internal sealed class MainForm : Form
     {
         var policy = WebViewPolicy.ForThisBuild;
         WebViewLockdown.ClearEnvironmentOverrides(policy);
+        NetworkPrediction.TurnOff(folders.WebViewDataFolder);
         var environment = await CoreWebView2Environment.CreateAsync(
             browserExecutableFolder: null,
             userDataFolder: folders.WebViewDataFolder,
@@ -105,6 +106,7 @@ internal sealed class MainForm : Form
         view.AllowExternalDrop = false;
 
         var core = view.CoreWebView2;
+        NetworkPrediction.EnsureTurnedOffFor(core.Profile, folders.WebViewDataFolder, policy);
         WebViewLockdown.Apply(core, policy, log);
         core.ProcessFailed += OnProcessFailed;
         core.WebMessageReceived += OnWebMessageReceived;
