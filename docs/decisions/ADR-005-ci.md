@@ -1,7 +1,7 @@
 # ADR-005: Build and CI — public GitHub repository with GitHub Actions
 
 **Status:** proposed · **Decided by:** owner (public GitHub repository, brief decision 12; what the tests
-are) · agent (pipeline) · **Introduced by:** 001-foundation
+are) · agent (pipeline) · **Introduced by:** 001-foundation · **Amended by:** 002-holiday-planner
 
 ## Context
 
@@ -24,6 +24,9 @@ winget manifest (ADR-002). No running cost is accepted. The repository holds no 
   the self-contained executables, the per-user installer and the developer CLI, published on a GitHub
   Release with their SHA-256 hashes, using only the workflow's own token. Started by hand, the same
   workflow is a dry run: everything is built and kept as workflow artifacts, nothing is released.
+  Before the tag, `pwsh tools/check-preconnect.ps1` passes on a Windows 11 machine with the WebView2
+  runtime: the App's web view does not preconnect to its own host (ADR-006). It needs a desktop session,
+  so it runs by hand, not in the workflow.
 - **winget:** the release workflow writes the version's manifest as a workflow artifact; the owner
   submits it to `microsoft/winget-pkgs` from their GitHub account (`wingetcreate submit` the first
   time, `wingetcreate update --submit` after); no personal token is stored in the repository.

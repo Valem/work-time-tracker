@@ -87,7 +87,9 @@ does not raise `WebResourceRequested`, so request filtering cannot be the guard 
   the options then are a Fixed Version WebView2 runtime in the installer (~+150 MB, its own updates)
   or a native UI.
 - Network prediction is turned off through the runtime's own profile preference, not a WebView2 API: a runtime
-  that renamed it would preconnect again, which only the network measurement shows.
+  that renamed it would preconnect again. `tools/check-preconnect.ps1`, run before every release (ADR-005), shows
+  it: it starts the Debug App with the runtime's net log on and fails if any event names the App's host, beside a
+  positive control whose profile predicts.
 - **Hard to undo:** medium — the screens are rewritten on a UI change; the core and bridge contract
   stay.
 
