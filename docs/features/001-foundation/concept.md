@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.6.6 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.3 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
+**Version:** v1.6.6 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.3 (approved) · **Vision:** [vision.md](../../vision.md) v1.4.2
 
 ## 1. Executive Context
 

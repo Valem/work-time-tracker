@@ -55,16 +55,16 @@ function Get-FreePort {
 }
 
 function Get-ProcessTree {
-    param([int] $RootId)
+    param([int] $RootId, [datetime] $RootStart)
     $all = Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate
     $tree = [System.Collections.Generic.List[object]]::new()
-    $parents = [System.Collections.Generic.Queue[int]]::new()
-    $parents.Enqueue($RootId)
+    $parents = [System.Collections.Generic.Queue[object]]::new()
+    $parents.Enqueue(@{ Id = $RootId; Created = $RootStart })
     while ($parents.Count -gt 0) {
         $parent = $parents.Dequeue()
-        foreach ($child in $all | Where-Object { $_.ParentProcessId -eq $parent -and $_.ProcessId -ne $parent }) {
+        foreach ($child in $all | Where-Object { $_.ParentProcessId -eq $parent.Id -and $_.ProcessId -ne $parent.Id -and $_.CreationDate -ge $parent.Created }) {
             $tree.Add($child)
-            $parents.Enqueue([int]$child.ProcessId)
+            $parents.Enqueue(@{ Id = [int]$child.ProcessId; Created = $child.CreationDate })
         }
     }
     return $tree
@@ -143,7 +143,7 @@ function Invoke-AppRun {
     try {
         Wait-PageLoaded -App $app -Port $debugPort
         Start-Sleep -Seconds $SettleSeconds
-        $started = Get-ProcessTree -RootId $app.Id
+        $started = Get-ProcessTree -RootId $app.Id -RootStart $app.StartTime
         $app.Refresh()
         $null = $app.CloseMainWindow()
         if (-not $app.WaitForExit(20000)) { $app.Kill($true) }
