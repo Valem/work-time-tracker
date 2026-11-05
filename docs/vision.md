@@ -1,6 +1,6 @@
 # Work Time Tracker — Vision
 
-**Version:** v1.4.1 — approved 2026-10-30
+**Version:** v1.4.2 — approved 2026-11-05
 
 ## Problem
 Keeping track of working hours by hand is effort that is easily forgotten, while the     [you]
@@ -37,8 +37,8 @@ overview and for typing them into the employer's timesheet.
   open source: once per canton and year for last, this and next year, once per click to
   reload them, and after a failure once more at the next start or at a need an hour
   later; each request names only the country, canton and year. The browser engine that
-  shows the screens may make its own update and time checks to Microsoft; they carry no
-  data.
+  shows the screens may make its own update, time and configuration checks to Microsoft;
+  they carry no data.
 - **Free, no running cost** — no subscription, server or paid certificate. Rules out    [you]
   paid code signing; Windows may warn on first install.
 

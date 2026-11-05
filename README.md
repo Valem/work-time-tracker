@@ -20,7 +20,7 @@ canton's public holidays.
   you. Uninstalling removes them.
 - The app sends nothing about you. Its only request fetches your canton's public holidays for a year from
   [OpenHolidays](https://www.openholidaysapi.org). The Microsoft Edge WebView2 runtime that draws its screens
-  makes its own update checks to Microsoft.
+  makes its own update, time and configuration checks to Microsoft.
 - No account, no telemetry, no update code: updates come through winget.
 
 ## Install

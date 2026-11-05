@@ -1,6 +1,6 @@
 # Foundation — Technical Concept
 
-**Version:** v1.6.5 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.2 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
+**Version:** v1.6.6 · **Feature:** 001-foundation · **Brief:** [brief.md](brief.md) v1.4.3 (approved) · **Vision:** [vision.md](../../vision.md) v1.3.0
 
 ## 1. Executive Context
 
@@ -29,7 +29,7 @@
 | FR-004 | Show a Monday-start week (each day's start, end, break, total, week total) and a day timeline that explains ignored Windows wakes, the lunch deduction and the evening pause (outcomes 1, 4, A1, E2) | Preact UI in WebView2 over the bridge (ADR-006) |
 | FR-005 | Lunch window and minimum-break tiers, prefilled (P1) — the only setup (outcomes 1, 3, K4) | Lunch rules with the date they apply from (ADR-004, BR-009) |
 | FR-006 | Show whether recording runs and when it last recorded (K2) | App reads the latest coverage span and whether this session's Recorder holds its mutex |
-| NFR-001 | No process of the app opens a network connection — WebView2 children and crash reporting included — except the WebView2 runtime's own update and time checks to Microsoft (outcome 7) | — |
+| NFR-001 | No process of the app opens a network connection — WebView2 children and crash reporting included — except the WebView2 runtime's own update, time and configuration checks to Microsoft (outcome 7) | — |
 | NFR-002 | Data lives only in the person's local, non-roaming profile, readable by them only, kept until uninstall (vision limit, K3) | — |
 | NFR-003 | The Recorder never keeps the laptop awake and averages < 0.5 % CPU (outcome 6) | — |
 | NFR-004 | Installs and upgrades per user with one winget command, without admin rights; the app holds no update code (vision) | — |
@@ -369,7 +369,7 @@ Development runs through the signed `dotnet` host; Smart App Control is never tu
 | AC-2.4 | On a laptop with S3 sleep and "require sign-in after sleep: never": standby at lunch, then input → use restarts at the first input ± 60 s; overnight Windows wakes add no use; `powercfg /requests` never lists the Recorder; its CPU averages < 0.5 % over 4 h awake | FR-001, BR-001, BR-002 |
 | AC-2.5 | Recorder stopped for 30 minutes with a lock and an unlock inside → on its next start the gap is filled from history and that day is marked rebuilt; a stop during continuous use leaves the day as recorded | FR-002, BR-004 |
 | AC-2.6 | `winget validate` passes; `Tools/SandboxTest.ps1` installs the manifest in Windows Sandbox; a Defender scan of the installed folder finds nothing; `wtt-setup.exe /VERYSILENT /CURRENTUSER` installs without admin rights or a UAC prompt; upgrading in place keeps the facts; uninstalling removes the program, the `Run` value and the data folder (K3) | FR-001, UC-002 |
-| AC-2.7 | WebView2 open on the placeholder for 4 h awake → no outbound connection from the app's process tree but the runtime's own update and time checks (NFR-001 probe); a second standard user account is denied opening the data file (NFR-002) | FR-001, UC-002 |
+| AC-2.7 | WebView2 open on the placeholder for 4 h awake → no outbound connection from the app's process tree but the WebView2 runtime's own update, time and configuration checks to Microsoft (NFR-001 probe); a second standard user account is denied opening the data file (NFR-002) | FR-001, UC-002 |
 | AC-2.8 | Unlock 08:00, lock 12:00–13:00, lock 17:30, unlock 22:40, shutdown 22:42 → start 08:00, end 17:30, break 1:00, total 8:32; the same visit at 19:30–19:32 (last pause 2:00) → end 17:30, total 8:32; at 19:29–19:31 (last pause 1:59) → end 19:31, total 10:31 | FR-003, BR-005, BR-012 |
 | AC-2.9 | Unlock 08:00, lock 12:15–15:00, lock 17:00 → the last pause starts inside the lunch window and is the lunch pause: end 17:00, break 2:45, total 6:15 | FR-003, BR-007, BR-012 |
 | AC-2.10 | Unlock 08:00, lock 15:00 → break 0:15, total 6:45; with a visit 20:00–20:20 added → end 15:00, break 0:20, total 7:00 (the evening minutes count toward the tier) | FR-003, BR-008, BR-012 |
