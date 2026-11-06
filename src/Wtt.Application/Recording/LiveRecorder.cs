@@ -1,0 +1,277 @@
+using System.Globalization;
+using Wtt.Application.Ports;
+using Wtt.Domain.Facts;
+
+namespace Wtt.Application.Recording;
+
+/// <summary>
+/// Turns what Windows tells the Recorder into live facts and coverage, without judging them: whether a
+/// signal is use is the domain's call. Calls must come one at a time; the host serializes them.
+/// </summary>
+public sealed class LiveRecorder(
+    IFactJournal journal,
+    ICoverageLog coverage,
+    IHistoryCatchUp history,
+    IDesktop desktop,
+    TimeProvider clock)
+{
+    public static readonly TimeSpan HeartbeatInterval = TimeSpan.FromMinutes(1);
+
+    /// <summary>How often the last input is read while a resume without a lock screen waits for the person.</summary>
+    public static readonly TimeSpan InputPollInterval = TimeSpan.FromSeconds(5);
+
+    /// <summary>A heartbeat this soon after a suspend notification may still run before Windows actually suspends.</summary>
+    private static readonly TimeSpan SuspendSettling = TimeSpan.FromSeconds(10);
+
+    /// <summary>Windows announces one wake more than once (automatic, then suspend resume) within this.</summary>
+    private static readonly TimeSpan SameWake = TimeSpan.FromSeconds(30);
+
+    private SignInSession? session;
+    private DateTimeOffset startedAt;
+    private DateTimeOffset lastBeat;
+    private DateTimeOffset? suspendedAt;
+    private DateTimeOffset? lastResumeAt;
+    private bool locked;
+    private DateTimeOffset? lidClosedAt;
+    private DateTimeOffset? awaitingInputSince;
+    private volatile bool awaitsInput;
+    private EndReason? idleLockWritten;
+
+    /// <summary>
+    /// True while an unlocked session the Recorder did not see begin — a resume without a lock screen, or its own
+    /// start — waits for the first real input; read from any thread.
+    /// </summary>
+    public bool AwaitsInput => awaitsInput;
+
+    private SignInSession Session => session ?? throw new InvalidOperationException("The Recorder has not started.");
+
+    /// <summary>
+    /// Coverage (from the sign-in when started right after it), the idle lock timeout in force, and the sign-in
+    /// only when coverage reaches back to it: a sign-in before coverage is history's, so the stretch up to the start
+    /// is rebuilt. <see cref="CatchUpAsync"/> follows.
+    /// </summary>
+    public async Task StartAsync()
+    {
+        var now = Now();
+        session = desktop.CurrentSession();
+        locked = session.Locked;
+        startedAt = now;
+        lastBeat = now;
+
+        var coveredFrom = await coverage.BeginAsync(session.SignedInAt);
+        idleLockWritten = EndReasons.IdleLockInForce(desktop.TimersInForce());
+        var facts = new List<ActivityFact>();
+        if (coveredFrom <= session.SignedInAt)
+        {
+            facts.Add(Fact(FactKind.SignIn, InForceAt(session.SignedInAt)));
+        }
+
+        facts.Add(IdleTimeoutFact(now, idleLockWritten));
+        await journal.AppendAsync(facts);
+        if (!locked)
+        {
+            AwaitInputSince(now);
+        }
+    }
+
+    /// <summary>Imports what Windows kept since the cursor: the days before the first start and any gap since.</summary>
+    public Task CatchUpAsync() => history.CatchUpAsync();
+
+    public async Task HeartbeatAsync()
+    {
+        var now = Now();
+        if (suspendedAt is { } suspended)
+        {
+            if (now - suspended > SuspendSettling)
+            {
+                await OnResumedAsync(now);
+            }
+
+            return;
+        }
+
+        var gap = now - lastBeat > ICoverageLog.MaxHeartbeatGap;
+        await coverage.ExtendAsync(now);
+        lastBeat = now;
+        await RecordIdleLockIfChangedAsync(now);
+        if (gap)
+        {
+            await history.CatchUpAsync();
+        }
+    }
+
+    /// <summary>Records the first real input after a resume without a lock screen.</summary>
+    public async Task PollInputAsync()
+    {
+        if (awaitingInputSince is not { } since)
+        {
+            return;
+        }
+
+        var lastInput = desktop.LastInput();
+        if (lastInput <= since)
+        {
+            return;
+        }
+
+        StopAwaitingInput();
+        await journal.AppendAsync([Fact(FactKind.LastInput, InForceAt(lastInput))]);
+    }
+
+    public Task OnSignalAsync(LiveSignal signal) => signal.Kind switch
+    {
+        LiveSignalKind.Locked => OnLockedAsync(signal),
+        LiveSignalKind.Unlocked => OnUnlockedAsync(signal.At),
+        LiveSignalKind.Suspending => OnSuspendingAsync(signal),
+        LiveSignalKind.Resumed => OnResumedAsync(signal.At),
+        LiveSignalKind.LidClosed => OnLidAsync(signal.At),
+        LiveSignalKind.LidOpened => OnLidAsync(closedAt: null),
+        LiveSignalKind.SigningOut => OnSessionEndAsync(FactKind.SignOut, EndCause.SignOut, signal),
+        LiveSignalKind.ShuttingDown => OnSessionEndAsync(FactKind.Shutdown, EndCause.Shutdown, signal),
+        _ => throw new ArgumentOutOfRangeException(nameof(signal), signal.Kind, "Unknown signal."),
+    };
+
+    private Task OnLockedAsync(LiveSignal signal)
+    {
+        locked = true;
+        StopAwaitingInput();
+        return EndUseAsync(FactKind.Lock, signal, (idle, timers) => EndReasons.ForLock(idle, timers, LidJustClosed(signal.At)));
+    }
+
+    private Task OnUnlockedAsync(DateTimeOffset at)
+    {
+        locked = false;
+        StopAwaitingInput();
+        return journal.AppendAsync([Fact(FactKind.Unlock, at)]);
+    }
+
+    private async Task OnSuspendingAsync(LiveSignal signal)
+    {
+        if (suspendedAt is not null)
+        {
+            return;
+        }
+
+        var at = signal.At;
+        StopAwaitingInput();
+        await EndUseAsync(FactKind.StandbyEnter, signal, (idle, timers) => EndReasons.ForStandby(idle, timers, LidJustClosed(at)));
+        await coverage.ExtendAsync(at);
+        suspendedAt = at;
+        lastBeat = at;
+    }
+
+    /// <summary>
+    /// Windows announces a wake the person caused twice (automatic, then suspend resume); only the first counts.
+    /// A resume without a suspend seen before it — a missed suspend notification, which Windows follows with a
+    /// critical resume — is a wake of its own and may be a gap in coverage.
+    /// </summary>
+    private async Task OnResumedAsync(DateTimeOffset at)
+    {
+        var gap = false;
+        if (suspendedAt is { } from)
+        {
+            await coverage.ResumeAsync(from, at);
+            suspendedAt = null;
+        }
+        else if (lastResumeAt is { } previous && at - previous <= SameWake)
+        {
+            return;
+        }
+        else
+        {
+            gap = at - lastBeat > ICoverageLog.MaxHeartbeatGap;
+            await coverage.ExtendAsync(at);
+        }
+
+        lastResumeAt = at;
+        lastBeat = at;
+        await journal.AppendAsync([Fact(FactKind.StandbyExit, at)]);
+        if (!locked)
+        {
+            AwaitInputSince(at);
+        }
+
+        if (gap)
+        {
+            await history.CatchUpAsync();
+        }
+    }
+
+    private Task OnLidAsync(DateTimeOffset? closedAt)
+    {
+        lidClosedAt = closedAt;
+        return Task.CompletedTask;
+    }
+
+    private async Task OnSessionEndAsync(FactKind kind, EndCause cause, LiveSignal signal)
+    {
+        StopAwaitingInput();
+        await EndUseAsync(kind, signal, (_, _) => new EndReason(cause));
+        await coverage.ExtendAsync(signal.At);
+        lastBeat = signal.At;
+    }
+
+    /// <summary>
+    /// The session's last input goes with every end, so a timer end can fall back to it (BR-003). Both it and the
+    /// timers are taken as they were when the signal arrived.
+    /// </summary>
+    private Task EndUseAsync(FactKind kind, LiveSignal signal, Func<TimeSpan, IdleTimers, EndReason> reasonAfterIdle)
+    {
+        var at = signal.At;
+        var context = signal.Context ?? new SignalContext(desktop.LastInput(), desktop.TimersInForce());
+        var lastInput = context.LastInput;
+        var idle = at > lastInput ? at - lastInput : TimeSpan.Zero;
+        var reason = reasonAfterIdle(idle, context.Timers);
+
+        var facts = new List<ActivityFact>();
+        if (lastInput >= startedAt && lastInput <= at)
+        {
+            facts.Add(Fact(FactKind.LastInput, lastInput.ToOffset(at.Offset)));
+        }
+
+        facts.Add(Fact(kind, at, new FactDetail(reason.Cause, reason.Timer, Session: Session.Id)));
+        return journal.AppendAsync(facts);
+    }
+
+    private async Task RecordIdleLockIfChangedAsync(DateTimeOffset now)
+    {
+        var inForce = EndReasons.IdleLockInForce(desktop.TimersInForce());
+        if (inForce != idleLockWritten)
+        {
+            idleLockWritten = inForce;
+            await journal.AppendAsync([IdleTimeoutFact(now, inForce)]);
+        }
+    }
+
+    private bool LidJustClosed(DateTimeOffset at) =>
+        lidClosedAt is { } closed && at - closed <= EndReasons.LidWindow && at >= closed;
+
+    /// <summary>An input the poll has not read yet stays awaited from the earlier instant.</summary>
+    private void AwaitInputSince(DateTimeOffset at)
+    {
+        awaitingInputSince ??= at;
+        awaitsInput = true;
+    }
+
+    private void StopAwaitingInput()
+    {
+        awaitingInputSince = null;
+        awaitsInput = false;
+    }
+
+    private ActivityFact IdleTimeoutFact(DateTimeOffset at, EndReason? idleLock) =>
+        Fact(FactKind.IdleTimeout, at, new FactDetail(idleLock?.Cause, idleLock?.Timer, Session: Session.Id));
+
+    private DateTimeOffset Now() => InForceAt(clock.GetUtcNow());
+
+    /// <summary>An instant Windows reported, with the UTC offset the local time zone gives it.</summary>
+    private DateTimeOffset InForceAt(DateTimeOffset instant) => TimeZoneInfo.ConvertTime(instant, clock.LocalTimeZone);
+
+    /// <summary><paramref name="at"/> carries the UTC offset in force when it happened, and the fact keeps it.</summary>
+    private ActivityFact Fact(FactKind kind, DateTimeOffset at, FactDetail? detail = null) =>
+        new(at, kind, FactSource.Live, SourceKey(kind, at), detail ?? new FactDetail(Session: Session.Id));
+
+    /// <summary>Kind, session and instant: the same sign-in or last input noted twice is stored once.</summary>
+    private string SourceKey(FactKind kind, DateTimeOffset at) =>
+        string.Create(CultureInfo.InvariantCulture, $"live:{kind}:{Session.Id}@{at.UtcDateTime:yyyy-MM-ddTHH:mm:ss.fffffffZ}");
+}

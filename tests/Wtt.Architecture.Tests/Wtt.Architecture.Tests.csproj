@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Wtt.Infrastructure/Wtt.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Built before the test, which reads their assemblies from their own build output for the network check. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Wtt.PublicHolidays/Wtt.PublicHolidays.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../src/Wtt.App/Wtt.App.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../src/Wtt.Recorder/Wtt.Recorder.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../src/Wtt.Cli/Wtt.Cli.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../src/Wtt.BridgeTypes/Wtt.BridgeTypes.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

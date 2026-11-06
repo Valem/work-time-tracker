@@ -1,0 +1,103 @@
+# ADR-006: UI — Preact + TypeScript in WebView2, a message bridge, and a locked-down, silent web view
+
+**Status:** proposed · **Decided by:** owner (web UI in WebView2) · agent (library, bridge, lockdown)
+· **Introduced by:** 001-foundation · **Amended by:** 002-holiday-planner
+
+## Context
+
+The owner chose a web UI hosted in WebView2 (ADR-001). 001 needs three screens — week, day timeline,
+lunch settings — and 002 adds a year planner worked by dragging and clicking. The page sends nothing over
+the network — the app's only request is the App host's public-holiday request (ADR-007) — but WebView2 is a Chromium runtime
+with its own background services, and **no documented switch silences them all** [3]; SmartScreen
+checks every navigation unless disabled [1]. Content served through a virtual-host folder mapping
+does not raise `WebResourceRequested`, so request filtering cannot be the guard [2].
+
+## Decision
+
+- **Library:** Preact with TypeScript, bundled by Vite on Node LTS; its type check runs in the verify
+  command (ADR-005). The screens follow the 001 concept's descriptions (week, day timeline, settings,
+  recording status) and 002's (year planner, «Mein Jahr», the week's day marks). Vite's esbuild and Rollup run as their WebAssembly builds (`esbuild-wasm`,
+  `@rollup/wasm-node`, npm overrides), because Smart App Control may block their unsigned native binaries
+  on a development laptop, while WebAssembly runs inside the signed Node.js.
+- **Serving:** the built assets ship in the install folder and load from a virtual host mapped to
+  it; no dev server or remote URL in a release build.
+- **Bridge:** typed JSON request/response messages over `chrome.webview.postMessage` and
+  `WebMessageReceived`, one contract defined once — C# records, each message type registered once
+  with its request record, its result record and its handler, and a closed set of refusal codes in
+  the App, serialized with one shared `JsonSerializerOptions` (Web defaults: camelCase, enums as
+  camelCase strings; strict reading, so a field missing, extra, null or mistyped refuses the message).
+  The host answers only its own page's origin and known message types, validates every payload,
+  writes each result as its message's result record, and refuses with a code, never a text; the
+  details go to the error log only. No host objects injected into script.
+- **Declarations:** a small in-repo build-time program, `Wtt.BridgeTypes`, runs after the App compiles,
+  reads those records, codes and serializer options, and writes the TypeScript declarations the UI
+  type check compiles against, so a drift between the two fails the verify command. It won over
+  generator packages because about two dozen records and three enums need no dependency, and reading
+  the serializer options themselves keeps the wire names and the declared names identical by
+  construction.
+- **Text and formats:** in the UI, a registry of locales, each one language's texts (every screen text,
+  the weekday names and one per refusal code) joined with one region's formats (date, week, time,
+  duration, and reading a typed time or duration back into minutes), over the bridge's plain values —
+  never `Intl` or a JS `Date`. The types make every locale supply all of them, so adding a language or
+  a format adds a definition and changes no screen (open/closed, owner). One place in the host decides
+  the active locale, sets the host's UI culture from it — the host's own few messages come from its
+  .NET resources — and passes its name to the UI, which looks it up in the registry. 001 ships German with Swiss formats (de-CH) only, always active.
+- **Lockdown, all required:**
+  - navigation outside the app host is cancelled; new windows are refused;
+  - downloads, external protocols, permissions, script dialogs, browser extensions and single sign-on
+    are off; a link or file dropped on the window opens nothing; the planner's drags are pointer events
+    within the page, never HTML drag and drop;
+  - a Content-Security-Policy of `'self'` only — no remote scripts, styles, fonts or connections; the page
+    never requests the public holidays itself (ADR-007);
+  - reputation checking (SmartScreen) off for the app's own pages; autofill and password saving off;
+  - network prediction (preconnect, DNS prefetch, preloading) off: the runtime preconnects to a page's host
+    as it starts navigating, below the virtual host, so the app host's name would reach the proxy or DNS [6];
+    WebView2 has no option for it, so before the runtime starts the App sets the profile's own preference
+    (`net.network_prediction_options` = 2, never) and shows no page if the runtime opens another profile;
+  - the WebView2 user-data folder lives in the app's data folder (ADR-004);
+  - in a release build, DevTools, the default context menu and the browser's shortcut keys are off,
+    and the `WEBVIEW2_*` environment overrides are cleared before the runtime starts, which must then
+    keep its profile in the data folder — no debugging port, other profile or other runtime;
+  - crash reports stay local: `IsCustomCrashReportingEnabled = true` for WebView2, and both executables
+    are excluded from Windows Error Reporting per user (`WerAddExcludedApplication`).
+- **Runtime:** the Evergreen WebView2 runtime that ships with Windows 11; its updates are Windows'
+  own (Edge Update), not the app's.
+- **Proof, not assumption:** the network traffic of the app's whole process tree, WebView2 children
+  included, is measured on real runs (001 concept, Phase-2 probe, Phases 3 and 4; 002 concept). The only
+  connections allowed are the WebView2 runtime's own update, time and configuration checks to Microsoft (owner, after the
+  Phase-2 probe found them) and the App host's public-holiday request with its DNS lookup and what Windows
+  fetches to find the proxy (ADR-007, owner); any other connection is a finding.
+
+## Rejected alternatives
+
+| Option | Why not |
+|--------|---------|
+| No framework (plain TypeScript + DOM, like the prototype) | Fine for three read-only screens; 002's year planner would hand-build state and re-rendering |
+| React | Same component model as Preact at ~10× the bundle |
+| Vue, Svelte | Their own template compilers and conventions for no gain here |
+| Lit / web components | Lower-level; more hand-written state for the same screens |
+| Host objects (`AddHostObjectToScript`) | COM-visible classes, harder to version and test than plain messages |
+| Declaration generator packages (TypeGen, Reinforced.Typings, Tapper) | A dependency and its own naming configuration, which must be kept matching the serializer's, for about two dozen records |
+| Hand-written TypeScript declarations | A drift from the C# records would pass the type check and surface only at run time |
+
+## Consequences
+
+- Two languages meet only at the bridge contract.
+- If any other runtime connection cannot be eliminated by configuration, it is a **blocker for the owner**:
+  the options then are a Fixed Version WebView2 runtime in the installer (~+150 MB, its own updates)
+  or a native UI.
+- Network prediction is turned off through the runtime's own profile preference, not a WebView2 API: a runtime
+  that renamed it would preconnect again. `tools/check-preconnect.ps1`, run before every release (ADR-005), shows
+  it: it starts the Debug App with the runtime's net log on and fails if any event names the App's host, beside a
+  positive control whose profile predicts.
+- **Hard to undo:** medium — the screens are rewritten on a UI change; the core and bridge contract
+  stay.
+
+## Sources
+
+1. CoreWebView2Settings.IsReputationCheckingRequired — https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2settings.isreputationcheckingrequired
+2. Virtual hosts and WebResourceRequested — https://learn.microsoft.com/en-us/microsoft-edge/webview2/how-to/webresourcerequested · https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2.setvirtualhostnametofoldermapping
+3. WebView2 browser flags (diagnostic use; no supported switch for background networking) — https://learn.microsoft.com/microsoft-edge/webview2/concepts/webview-features-flags
+4. WerAddExcludedApplication — https://learn.microsoft.com/en-us/windows/win32/api/werapi/nf-werapi-weraddexcludedapplication
+5. CoreWebView2EnvironmentOptions.IsCustomCrashReportingEnabled — https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2environmentoptions.iscustomcrashreportingenabled
+6. NetworkPredictionOptions (DNS prefetching, TCP and SSL preconnection, prerendering) — https://learn.microsoft.com/deployedge/microsoft-edge-policies/networkpredictionoptions
