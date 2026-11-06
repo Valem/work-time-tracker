@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
 # Template: installer/winget/New-WingetManifest.ps1 fills the __TOKENS__.
-# One Inno Setup installer (ADR-002): per user by default, per machine only as the AppLocker fallback.
+# One Inno Setup installer: per user by default, per machine only where a policy blocks per-user programs.
 
 PackageIdentifier: __PACKAGE_IDENTIFIER__
 PackageVersion: __VERSION__
